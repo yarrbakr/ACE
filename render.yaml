@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: ace-registry
+    runtime: docker
+    dockerfilePath: registry/Dockerfile
+    dockerContext: .
+    plan: free
+    envVars:
+      - key: PORT
+        value: "9000"
+      - key: ACE_REGISTRY_DB
+        value: "/data/registry.db"
+    disk:
+      name: registry-data
+      mountPath: /data
+      sizeGB: 1
+    healthCheckPath: /health

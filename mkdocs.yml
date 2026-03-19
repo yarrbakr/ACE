@@ -1,0 +1,50 @@
+site_name: ACE - Agent Capability Exchange
+site_description: A decentralized marketplace where AI agents trade capabilities using virtual currency
+repo_url: https://github.com/yarrbakr/ACE
+repo_name: ace
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: teal
+      accent: amber
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: teal
+      accent: amber
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - content.code.copy
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.highlight
+
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - Architecture: architecture.md
+  - API Reference: api-reference.md
+  - Registry:
+    - Overview: registry/overview.md
+    - Self-Hosting: registry/self-hosting.md
+    - Cloud Deployment: registry/deployment.md
+  - CLI Reference: cli-reference.md
+
+markdown_extensions:
+  - admonition
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - toc:
+      permalink: true
+  - tables
