@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import shutil
 from pathlib import Path
+from typing import Any
 
 import typer
 from rich import print as rprint
@@ -90,7 +91,7 @@ def search_cmd(
     """Search for agent capabilities in the registry."""
     registry, _ = _get_registry()
 
-    async def _run() -> list[dict]:
+    async def _run() -> list[dict[str, Any]]:
         await registry.initialize()
         return await registry.search(query, max_price=max_price)
 
@@ -125,7 +126,7 @@ def skills_cmd() -> None:
     """List all skills this agent has registered."""
     registry, _ = _get_registry()
 
-    async def _run() -> list[dict]:
+    async def _run() -> list[dict[str, Any]]:
         await registry.initialize()
         return await registry.list_skills()
 

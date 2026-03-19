@@ -58,13 +58,13 @@ class GossipDiscovery(DiscoveryAdapter):
     def _own_peer_info(self) -> PeerInfo:
         """Build PeerInfo for the local agent."""
         url = f"http://127.0.0.1:{self._settings.port}"
+        existing = self._peer_manager.get_peer(self._identity.aid)
+        agent_card = existing.agent_card if existing else {}
         return PeerInfo(
             aid=self._identity.aid,
             url=url,
             public_key_b64=self._identity.public_key_b64,
-            agent_card=self._peer_manager.get_peer(self._identity.aid).agent_card
-            if self._peer_manager.get_peer(self._identity.aid)
-            else {},
+            agent_card=agent_card,
             last_seen=datetime.now(UTC),
             version=self._own_version,
         )

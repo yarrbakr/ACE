@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from fastapi import APIRouter, Depends, Query, Request
 
@@ -64,10 +64,10 @@ async def register_capability(
         version=body.version,
         tags=body.tags,
         parameters=body.parameters,
-        returns=body.returns,
+        returns={"description": body.returns} if body.returns else {},
         pricing=SkillPricing(
             currency=body.currency,
-            model=body.pricing_model,
+            model=cast("Any", body.pricing_model),
             amount=body.price,
         ),
     )
