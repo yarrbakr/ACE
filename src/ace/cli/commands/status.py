@@ -21,10 +21,7 @@ def status_cmd(
         resp = httpx.get(url, timeout=5.0)
         data = resp.json()
     except httpx.ConnectError:
-        rprint(
-            "[yellow]Agent is not running.[/yellow] "
-            "Start it with: [bold]ace start[/bold]"
-        )
+        rprint("[yellow]Agent is not running.[/yellow] Start it with: [bold]ace start[/bold]")
         raise typer.Exit(code=1) from None
     except Exception as exc:
         rprint(f"[red]Error:[/red] {exc}")

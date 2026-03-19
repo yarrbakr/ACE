@@ -64,9 +64,7 @@ class PeerManager:
                 pruned.append(aid)
         return pruned
 
-    def search_peers(
-        self, query: str, max_price: int | None = None
-    ) -> list[PeerInfo]:
+    def search_peers(self, query: str, max_price: int | None = None) -> list[PeerInfo]:
         """Search peers by keyword in agent_card (name, description, tags)."""
         words = query.lower().split()
         if not words:
@@ -77,10 +75,12 @@ class PeerManager:
             card = peer.agent_card
             if not card:
                 continue
-            searchable = " ".join([
-                card.get("name", ""),
-                card.get("description", ""),
-            ]).lower()
+            searchable = " ".join(
+                [
+                    card.get("name", ""),
+                    card.get("description", ""),
+                ]
+            ).lower()
 
             # Also search capabilities
             for cap in card.get("capabilities", []):

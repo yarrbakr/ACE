@@ -34,16 +34,12 @@ def _error_json(code: str, message: str, status_code: int) -> JSONResponse:
     )
 
 
-async def _lookup_public_key(
-    db_path: Any, agent_id: str
-) -> Ed25519PublicKey | None:
+async def _lookup_public_key(db_path: Any, agent_id: str) -> Ed25519PublicKey | None:
     """Look up an agent's public key from the agents table."""
     try:
         async with aiosqlite.connect(db_path) as db:
             db.row_factory = aiosqlite.Row
-            cursor = await db.execute(
-                "SELECT public_key FROM agents WHERE aid = ?", (agent_id,)
-            )
+            cursor = await db.execute("SELECT public_key FROM agents WHERE aid = ?", (agent_id,))
             row = await cursor.fetchone()
             if row is None:
                 return None
@@ -64,9 +60,7 @@ class SignatureVerificationMiddleware(BaseHTTPMiddleware):
     4. Signature valid against raw request body
     """
 
-    async def dispatch(
-        self, request: Request, call_next: RequestResponseEndpoint
-    ) -> Response:
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         if request.method in _SAFE_METHODS:
             return await call_next(request)
 
@@ -74,13 +68,9 @@ class SignatureVerificationMiddleware(BaseHTTPMiddleware):
         signature_b64 = request.headers.get("X-Signature")
 
         if not agent_id:
-            return _error_json(
-                "UNAUTHORIZED", "Missing X-Agent-ID header", 401
-            )
+            return _error_json("UNAUTHORIZED", "Missing X-Agent-ID header", 401)
         if not signature_b64:
-            return _error_json(
-                "UNAUTHORIZED", "Missing X-Signature header", 401
-            )
+            return _error_json("UNAUTHORIZED", "Missing X-Signature header", 401)
 
         # Read body for signature verification
         body = await request.body()
@@ -109,9 +99,7 @@ class SignatureVerificationMiddleware(BaseHTTPMiddleware):
             sig_bytes = base64.b64decode(signature_b64)
             public_key.verify(sig_bytes, body)
         except Exception:
-            return _error_json(
-                "FORBIDDEN", "Invalid signature", 403
-            )
+            return _error_json("FORBIDDEN", "Invalid signature", 403)
 
         # Store verified agent ID for downstream handlers
         request.state.verified_agent_id = agent_id

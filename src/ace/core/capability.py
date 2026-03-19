@@ -24,9 +24,7 @@ class SkillPricing(BaseModel):
     """Pricing information for a skill."""
 
     model_config = ConfigDict(
-        json_schema_extra={
-            "examples": [{"currency": "AGC", "model": "per_call", "amount": 50}]
-        }
+        json_schema_extra={"examples": [{"currency": "AGC", "model": "per_call", "amount": 50}]}
     )
 
     currency: str = "AGC"
@@ -297,12 +295,14 @@ class CapabilityRegistry:
 
         results = []
         for aid, _card_json, name, price, tags in rows:
-            results.append({
-                "aid": aid,
-                "name": name,
-                "price": price,
-                "tags": tags,
-            })
+            results.append(
+                {
+                    "aid": aid,
+                    "name": name,
+                    "price": price,
+                    "tags": tags,
+                }
+            )
         return results
 
     async def list_all(self) -> list[dict[str, Any]]:
@@ -318,13 +318,15 @@ class CapabilityRegistry:
             )
             rows = await cursor.fetchall()
         for aid, name, description, price, tags in rows:
-            results.append({
-                "aid": aid,
-                "name": name,
-                "description": description,
-                "price": price,
-                "tags": tags,
-            })
+            results.append(
+                {
+                    "aid": aid,
+                    "name": name,
+                    "description": description,
+                    "price": price,
+                    "tags": tags,
+                }
+            )
         return results
 
 

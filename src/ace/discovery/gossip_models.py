@@ -40,6 +40,7 @@ class GossipConfig(BaseModel):
 
 # Request/response models for gossip HTTP endpoints
 
+
 class AnnounceRequest(BaseModel):
     """A peer announcing itself to the network."""
 

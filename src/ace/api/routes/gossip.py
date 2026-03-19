@@ -106,9 +106,7 @@ async def gossip_announce(
 
 
 @router.post("/leave", summary="Graceful peer departure", response_model=None)
-async def gossip_leave(
-    body: LeaveRequest, request: Request
-) -> dict[str, Any] | JSONResponse:
+async def gossip_leave(body: LeaveRequest, request: Request) -> dict[str, Any] | JSONResponse:
     """Process a peer's departure notice."""
     gossip = _get_gossip(request)
 

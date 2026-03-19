@@ -68,7 +68,9 @@ class AgentIdentity:
 
     @staticmethod
     def verify_with_public_key(
-        public_key: Ed25519PublicKey, message: bytes, signature: bytes,
+        public_key: Ed25519PublicKey,
+        message: bytes,
+        signature: bytes,
     ) -> bool:
         try:
             public_key.verify(signature, message)
@@ -83,7 +85,9 @@ class AgentIdentity:
         fernet_key = _derive_fernet_key(password, salt)
         fernet = Fernet(fernet_key)
         raw_private = self._private_key.private_bytes(
-            Encoding.Raw, PrivateFormat.Raw, NoEncryption(),
+            Encoding.Raw,
+            PrivateFormat.Raw,
+            NoEncryption(),
         )
         encrypted = fernet.encrypt(raw_private)
         path.write_bytes(salt + encrypted)

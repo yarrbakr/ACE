@@ -108,9 +108,7 @@ class GossipDiscovery(DiscoveryAdapter):
         self._peer_manager.remove_peer(aid)
         await self._send_leave_to_peers(aid)
 
-    async def search(
-        self, query: str, *, max_price: int | None = None
-    ) -> list[dict[str, Any]]:
+    async def search(self, query: str, *, max_price: int | None = None) -> list[dict[str, Any]]:
         peers = self._peer_manager.search_peers(query, max_price=max_price)
         return [p.agent_card for p in peers if p.agent_card]
 
@@ -129,12 +127,9 @@ class GossipDiscovery(DiscoveryAdapter):
             while True:
                 self._peer_manager.prune_stale_peers()
                 candidates = [
-                    p for p in self._peer_manager.get_all_peers()
-                    if p.aid != self._identity.aid
+                    p for p in self._peer_manager.get_all_peers() if p.aid != self._identity.aid
                 ]
-                selected = random.sample(
-                    candidates, min(self._config.fanout, len(candidates))
-                )
+                selected = random.sample(candidates, min(self._config.fanout, len(candidates)))
                 for peer in selected:
                     await self._exchange_with_peer(peer)
                 await asyncio.sleep(self._config.gossip_interval)
@@ -244,6 +239,7 @@ class GossipDiscovery(DiscoveryAdapter):
             from cryptography.hazmat.primitives.asymmetric.ed25519 import (
                 Ed25519PublicKey,
             )
+
             pub_key = Ed25519PublicKey.from_public_bytes(pub_bytes)
             pub_key.verify(sig_bytes, canonical.encode("utf-8"))
             return True
@@ -261,6 +257,7 @@ class GossipDiscovery(DiscoveryAdapter):
             from cryptography.hazmat.primitives.asymmetric.ed25519 import (
                 Ed25519PublicKey,
             )
+
             pub_key = Ed25519PublicKey.from_public_bytes(pub_bytes)
             pub_key.verify(sig_bytes, canonical.encode("utf-8"))
             return True
@@ -287,6 +284,7 @@ class GossipDiscovery(DiscoveryAdapter):
             from cryptography.hazmat.primitives.asymmetric.ed25519 import (
                 Ed25519PublicKey,
             )
+
             pub_key = Ed25519PublicKey.from_public_bytes(pub_bytes)
             pub_key.verify(sig_bytes, canonical.encode("utf-8"))
             return True

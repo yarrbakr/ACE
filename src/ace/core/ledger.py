@@ -125,9 +125,7 @@ class Ledger:
                 sender_balance: int = sender_row[0]
 
                 # Read receiver balance INSIDE the transaction
-                cursor = await db.execute(
-                    "SELECT balance FROM accounts WHERE aid = ?", (to_aid,)
-                )
+                cursor = await db.execute("SELECT balance FROM accounts WHERE aid = ?", (to_aid,))
                 receiver_row = await cursor.fetchone()
                 if receiver_row is None:
                     raise AccountNotFoundError(f"Account not found: {to_aid}")
@@ -254,9 +252,7 @@ class Ledger:
 # ── Module-level convenience functions ───────────────────────
 
 
-async def mint_tokens(
-    db_path: Path, to_aid: str, amount: int, description: str = ""
-) -> str:
+async def mint_tokens(db_path: Path, to_aid: str, amount: int, description: str = "") -> str:
     """Mint tokens using a one-shot Ledger instance."""
     ledger = Ledger(db_path)
     return await ledger.mint(to_aid, amount, description)

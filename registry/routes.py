@@ -36,9 +36,7 @@ def _error(code: str, message: str, status_code: int) -> JSONResponse:
 
 
 @router.post("/register", status_code=201, summary="Register an agent")
-async def register_agent(
-    body: RegisterAgentRequest, request: Request
-) -> dict[str, Any]:
+async def register_agent(body: RegisterAgentRequest, request: Request) -> dict[str, Any]:
     """Register or update an agent card in the global registry."""
     store = _get_store(request)
     await store.register_agent(body.aid, body.agent_card)
@@ -61,9 +59,7 @@ async def deregister_agent(
 
 
 @router.post("/heartbeat", summary="Send a heartbeat", response_model=None)
-async def heartbeat(
-    body: HeartbeatRequest, request: Request
-) -> dict[str, Any] | JSONResponse:
+async def heartbeat(body: HeartbeatRequest, request: Request) -> dict[str, Any] | JSONResponse:
     """Update heartbeat timestamp to keep registration alive."""
     store = _get_store(request)
     found = await store.heartbeat(body.aid)

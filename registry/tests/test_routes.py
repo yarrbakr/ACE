@@ -6,7 +6,6 @@ from fastapi.testclient import TestClient
 
 from registry.tests.conftest import SAMPLE_AGENT_CARD, SAMPLE_AGENT_CARD_2
 
-
 # ── Health ─────────────────────────────────────────────────
 
 
@@ -119,9 +118,7 @@ def test_search_max_price(registry_client: TestClient) -> None:
         json={"aid": "aid:test2", "agent_card": SAMPLE_AGENT_CARD_2},
     )
     # Only results with price <= 40
-    resp = registry_client.get(
-        "/search", params={"q": "python translation", "max_price": 40}
-    )
+    resp = registry_client.get("/search", params={"q": "python translation", "max_price": 40})
     data = resp.json()
     for result in data["results"]:
         assert result["price"] <= 40

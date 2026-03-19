@@ -121,9 +121,7 @@ def write_default_config(
 def require_config(config_path: Path = DEFAULT_CONFIG_FILE) -> AceSettings:
     """Load config or raise ConfigNotFoundError if the file is missing."""
     if not config_path.exists():
-        raise ConfigNotFoundError(
-            f"Config not found at {config_path}. Run 'ace init' first."
-        )
+        raise ConfigNotFoundError(f"Config not found at {config_path}. Run 'ace init' first.")
     return load_settings(config_path)
 
 

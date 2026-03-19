@@ -63,16 +63,12 @@ class PublicRegistryDiscovery(DiscoveryAdapter):
             logger.debug("Deregister from registry failed", exc_info=True)
         self._registered_aid = None
 
-    async def search(
-        self, query: str, *, max_price: int | None = None
-    ) -> list[dict[str, Any]]:
+    async def search(self, query: str, *, max_price: int | None = None) -> list[dict[str, Any]]:
         """Search the registry for capabilities."""
         params: dict[str, Any] = {"q": query}
         if max_price is not None:
             params["max_price"] = max_price
-        resp = await self._http.get(
-            f"{self._registry_url}/search", params=params
-        )
+        resp = await self._http.get(f"{self._registry_url}/search", params=params)
         resp.raise_for_status()
         return resp.json().get("results", [])  # type: ignore[no-any-return]
 

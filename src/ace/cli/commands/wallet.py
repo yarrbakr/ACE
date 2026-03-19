@@ -43,7 +43,9 @@ def balance_cmd() -> None:
             return 0
 
     balance = asyncio.run(_run())
-    rprint(f"Agent: [bold]{identity.aid}[/bold]  Balance: [bold green]{balance:,} AGC[/bold green]")
+    rprint(
+        f"Agent: [bold]{identity.aid}[/bold]  Balance: [bold green]{balance:,} AGC[/bold green]"
+    )
 
 
 def transfer_cmd(

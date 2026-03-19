@@ -8,9 +8,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from fastapi import Request
+from fastapi import Request
 
+if TYPE_CHECKING:
     from ace.core.capability import CapabilityRegistry
     from ace.core.config import AceSettings
     from ace.core.escrow import EscrowManager

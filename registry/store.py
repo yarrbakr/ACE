@@ -40,9 +40,7 @@ class RegistryStore:
         """Populate in-memory cache from SQLite."""
         self._cache.clear()
         async with aiosqlite.connect(self._db_path) as db:
-            cursor = await db.execute(
-                "SELECT aid, agent_card FROM registered_agents"
-            )
+            cursor = await db.execute("SELECT aid, agent_card FROM registered_agents")
             rows = await cursor.fetchall()
             for aid, card_json in rows:
                 self._cache[aid] = json.loads(card_json)
@@ -73,9 +71,7 @@ class RegistryStore:
                 (aid, card_json, name, description, url),
             )
             # Replace capabilities
-            await db.execute(
-                "DELETE FROM registry_capabilities WHERE aid = ?", (aid,)
-            )
+            await db.execute("DELETE FROM registry_capabilities WHERE aid = ?", (aid,))
             for cap in agent_card.get("capabilities", []):
                 tags_str = ",".join(cap.get("tags", []))
                 price = cap.get("pricing", {}).get("amount", 0)
@@ -100,9 +96,7 @@ class RegistryStore:
         """Remove an agent. Returns True if it existed."""
         async with aiosqlite.connect(self._db_path) as db:
             await db.execute("PRAGMA foreign_keys=ON")
-            cursor = await db.execute(
-                "DELETE FROM registered_agents WHERE aid = ?", (aid,)
-            )
+            cursor = await db.execute("DELETE FROM registered_agents WHERE aid = ?", (aid,))
             await db.commit()
             removed = cursor.rowcount > 0
 
@@ -128,9 +122,7 @@ class RegistryStore:
         """Retrieve an agent card by AID."""
         return self._cache.get(aid)
 
-    async def search(
-        self, query: str, *, max_price: int | None = None
-    ) -> list[dict[str, Any]]:
+    async def search(self, query: str, *, max_price: int | None = None) -> list[dict[str, Any]]:
         """Search capabilities by keyword with optional price filter.
 
         Uses OR-matching across words (same pattern as CapabilityRegistry).

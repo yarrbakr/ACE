@@ -169,8 +169,7 @@ class TransactionEngine:
                 current = TransactionState(row["state"])
                 if current != expected_from:
                     raise InvalidTransitionError(
-                        f"Expected state {expected_from.value}, "
-                        f"found {current.value}"
+                        f"Expected state {expected_from.value}, found {current.value}"
                     )
 
                 await db.execute(
@@ -210,13 +209,9 @@ class TransactionEngine:
     # ── Authorization helper ────────────────────────────────
 
     @staticmethod
-    def _check_actor(
-        actual: str, expected: str, action: str
-    ) -> None:
+    def _check_actor(actual: str, expected: str, action: str) -> None:
         if actual != expected:
-            raise UnauthorizedActionError(
-                f"{action} requires actor {expected}, got {actual}"
-            )
+            raise UnauthorizedActionError(f"{action} requires actor {expected}, got {actual}")
 
     # ── Public methods ──────────────────────────────────────
 
@@ -259,9 +254,7 @@ class TransactionEngine:
 
         return await self.get_transaction(tx_id)
 
-    async def submit_quote(
-        self, tx_id: str, price: int, seller_aid: str
-    ) -> Transaction:
+    async def submit_quote(self, tx_id: str, price: int, seller_aid: str) -> Transaction:
         """Seller submits a price quote. INITIATED → QUOTED."""
         if price <= 0:
             raise ValueError("Price must be positive")
@@ -329,9 +322,7 @@ class TransactionEngine:
 
         return await self.get_transaction(tx_id)
 
-    async def deliver_result(
-        self, tx_id: str, result_hash: str, seller_aid: str
-    ) -> Transaction:
+    async def deliver_result(self, tx_id: str, result_hash: str, seller_aid: str) -> Transaction:
         """Seller delivers the result. EXECUTING → VERIFYING."""
         if not result_hash or not result_hash.strip():
             raise ValueError("result_hash must not be empty")
@@ -374,9 +365,7 @@ class TransactionEngine:
 
         return await self.get_transaction(tx_id)
 
-    async def dispute(
-        self, tx_id: str, buyer_aid: str, reason: str = ""
-    ) -> Transaction:
+    async def dispute(self, tx_id: str, buyer_aid: str, reason: str = "") -> Transaction:
         """Buyer disputes delivery. VERIFYING → DISPUTED."""
         tx = await self.get_transaction(tx_id)
         self._check_actor(buyer_aid, tx.buyer_aid, "dispute")
@@ -391,9 +380,7 @@ class TransactionEngine:
 
         return await self.get_transaction(tx_id)
 
-    async def resolve_dispute(
-        self, tx_id: str, actor_aid: str, resolution: str
-    ) -> Transaction:
+    async def resolve_dispute(self, tx_id: str, actor_aid: str, resolution: str) -> Transaction:
         """Resolve a dispute — settle (pay seller) or refund (return to buyer).
 
         resolution must be 'settle' or 'refund'.
@@ -494,9 +481,7 @@ class TransactionEngine:
             history=history,
         )
 
-    async def list_transactions(
-        self, aid: str, role: str = "any"
-    ) -> list[Transaction]:
+    async def list_transactions(self, aid: str, role: str = "any") -> list[Transaction]:
         """List transactions for an agent, optionally filtered by role."""
         if role == "buyer":
             where = "WHERE buyer_aid = ?"
@@ -508,9 +493,7 @@ class TransactionEngine:
             raise ValueError(f"Invalid role filter: {role}")
 
         async with self._connect() as db:
-            params: tuple[str, ...] = (
-                (aid, aid) if role == "any" else (aid,)
-            )
+            params: tuple[str, ...] = (aid, aid) if role == "any" else (aid,)
             cursor = await db.execute(
                 "SELECT tx_id FROM transactions " + where + " ORDER BY created_at DESC",
                 params,
@@ -530,9 +513,7 @@ class TimeoutMonitor:
     - VERIFYING past timeout → auto-dispute
     """
 
-    def __init__(
-        self, engine: TransactionEngine, interval: float = 10.0
-    ) -> None:
+    def __init__(self, engine: TransactionEngine, interval: float = 10.0) -> None:
         self._engine = engine
         self._interval = interval
         self._task: asyncio.Task[None] | None = None
@@ -581,9 +562,7 @@ class TimeoutMonitor:
                     logger.info("Timeout refund: %s", tx_id)
                 elif state == TransactionState.VERIFYING:
                     tx = await self._engine.get_transaction(tx_id)
-                    await self._engine.dispute(
-                        tx_id, tx.buyer_aid, reason="Verification timeout"
-                    )
+                    await self._engine.dispute(tx_id, tx.buyer_aid, reason="Verification timeout")
                     logger.info("Timeout dispute: %s", tx_id)
             except Exception:
                 logger.exception("Timeout action failed for %s", tx_id)

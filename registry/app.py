@@ -62,9 +62,7 @@ class PruneTask:
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Initialize store and background pruner on startup."""
     db_path: Path = getattr(app.state, "db_path", DEFAULT_REGISTRY_DB)
-    prune_interval: float = getattr(
-        app.state, "prune_interval", DEFAULT_PRUNE_INTERVAL
-    )
+    prune_interval: float = getattr(app.state, "prune_interval", DEFAULT_PRUNE_INTERVAL)
     prune_max_age: float = getattr(app.state, "prune_max_age", DEFAULT_PRUNE_MAX_AGE)
 
     # Initialize store

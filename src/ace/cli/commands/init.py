@@ -101,6 +101,5 @@ def init_cmd(
     typer.echo(f"  Data dir     : {target / 'data'}")
     typer.echo("")
     typer.echo(
-        "Next: run [bold]ace register-skill path/to/SKILL.md[/bold]"
-        " then [bold]ace start[/bold]"
+        "Next: run [bold]ace register-skill path/to/SKILL.md[/bold] then [bold]ace start[/bold]"
     )

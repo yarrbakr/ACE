@@ -158,8 +158,7 @@ def create_app(
     app = FastAPI(
         title="Agent Capability Exchange",
         description=(
-            "REST API for the ACE agent marketplace — "
-            "trade AI capabilities using AGC tokens."
+            "REST API for the ACE agent marketplace — trade AI capabilities using AGC tokens."
         ),
         version=__version__,
         lifespan=lifespan,
@@ -185,21 +184,15 @@ def create_app(
 
     # Routes
     app.include_router(agent.router, prefix="/agents", tags=["agents"])
-    app.include_router(
-        transactions.router, prefix="/transactions", tags=["transactions"]
-    )
-    app.include_router(
-        discovery.router, prefix="/discovery", tags=["discovery"]
-    )
+    app.include_router(transactions.router, prefix="/transactions", tags=["transactions"])
+    app.include_router(discovery.router, prefix="/discovery", tags=["discovery"])
     app.include_router(admin.router, prefix="/admin", tags=["admin"])
 
     # Gossip routes (only in gossip mode)
     if settings.discovery_mode == DiscoveryMode.GOSSIP:
         from ace.api.routes import gossip as gossip_routes
 
-        app.include_router(
-            gossip_routes.router, prefix="/gossip", tags=["gossip"]
-        )
+        app.include_router(gossip_routes.router, prefix="/gossip", tags=["gossip"])
 
     # ── Root-level routes ───────────────────────────────────
 

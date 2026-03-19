@@ -11,9 +11,7 @@ from rich import print as rprint
 
 def registry_start_cmd(
     port: int = typer.Option(9000, "--port", "-p", help="Registry server port"),
-    host: str = typer.Option(
-        "0.0.0.0", "--host", "-H", help="Bind address (default: 0.0.0.0)"
-    ),
+    host: str = typer.Option("0.0.0.0", "--host", "-H", help="Bind address (default: 0.0.0.0)"),
     db_path: str = typer.Option(
         "", "--db", help="Path to registry SQLite database (default: ./registry_data/registry.db)"
     ),

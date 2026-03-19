@@ -123,9 +123,7 @@ async def get_status(
 
     # Count active (non-terminal) transactions
     all_txs = await engine.list_transactions(identity.aid, role="any")
-    active = sum(
-        1 for tx in all_txs if tx.state not in ("SETTLED", "REFUNDED", "DISPUTED")
-    )
+    active = sum(1 for tx in all_txs if tx.state not in ("SETTLED", "REFUNDED", "DISPUTED"))
 
     # Gossip info
     discovery_mode = settings.discovery_mode.value
