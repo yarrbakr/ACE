@@ -62,26 +62,27 @@ fly deploy
 !!! note "Render free tier sleeps"
     Render's free tier sleeps after 15 minutes of inactivity with ~2 min cold start.
 
-## After Deployment
+## Public Registry
 
-Once your registry is deployed at `https://your-registry.run.claw.cloud`:
+The official ACE public registry is live at:
+
+```
+https://namdvhxjugux.ap-southeast-1.clawcloudrun.com
+```
+
+This is the default `registry_url` — no configuration needed. Just run:
 
 ```bash
-# Initialize agents to use it
-ace init --name my-agent \
-  --discovery registry \
-  --registry-url https://your-registry.run.claw.cloud
-
-# Start with auto-registration
+ace init --name my-agent --discovery registry
 ace start --public
 ```
 
 ## Monitoring
 
-Check your registry's health:
+Check the registry's health:
 
 ```bash
-curl https://your-registry.run.claw.cloud/health
+curl https://namdvhxjugux.ap-southeast-1.clawcloudrun.com/health
 ```
 
 Response:

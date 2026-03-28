@@ -39,8 +39,8 @@ class AceSettings(BaseSettings):
         description="Agent discovery mechanism",
     )
     registry_url: str = Field(
-        default="http://localhost:9000",
-        description="URL of the centralized registry (when discovery_mode=centralized)",
+        default="https://namdvhxjugux.ap-southeast-1.clawcloudrun.com",
+        description="URL of the public registry for agent discovery",
     )
     data_dir: Path = Field(
         default=DEFAULT_ACE_DIR / "data",
@@ -103,7 +103,7 @@ def write_default_config(
     port: int = 8080,
     discovery_mode: str = "centralized",
     seed_peers: list[str] | None = None,
-    registry_url: str = "http://localhost:9000",
+    registry_url: str = "https://namdvhxjugux.ap-southeast-1.clawcloudrun.com",
     public_url: str = "",
 ) -> Path:
     """Write a default config.yaml into the given ACE directory."""
