@@ -35,7 +35,9 @@ def init_cmd(
         "", "--seed-peers", help="Comma-separated seed peer URLs for gossip mode"
     ),
     registry_url: str = typer.Option(
-        "https://namdvhxjugux.ap-southeast-1.clawcloudrun.com", "--registry-url", help="URL of the public registry"
+        "https://namdvhxjugux.ap-southeast-1.clawcloudrun.com",
+        "--registry-url",
+        help="URL of the public registry",
     ),
 ) -> None:
     """Initialize a new ACE agent node with a cryptographic identity."""
