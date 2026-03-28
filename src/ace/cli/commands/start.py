@@ -18,6 +18,9 @@ def start_cmd(
     public: bool = typer.Option(
         False, "--public", help="Register with the public registry on startup"
     ),
+    public_url: str = typer.Option(
+        "", "--public-url", help="Externally reachable URL (e.g. https://my-agent.example.com)"
+    ),
 ) -> None:
     """Start the ACE API server."""
     from ace.core.config import DEFAULT_ACE_DIR, DiscoveryMode, require_config
@@ -33,6 +36,19 @@ def start_cmd(
     # Override discovery mode when --public is used
     if public:
         settings.discovery_mode = DiscoveryMode.REGISTRY
+
+    # Override public URL if provided via CLI flag
+    if public_url:
+        settings.public_url = public_url
+
+    # Warn if --public is used without a public URL
+    if public and not settings.public_url:
+        rprint(
+            "[yellow]Warning:[/yellow] --public without --public-url means the agent card "
+            "will use localhost. Other agents won't be able to reach you.\n"
+            "  Set via: --public-url https://my-agent.example.com\n"
+            "  Or env:  ACE_PUBLIC_URL=https://my-agent.example.com"
+        )
 
     server_port = port or settings.port
 
@@ -67,6 +83,8 @@ def start_cmd(
     rprint(f"   Host:   [cyan]{host}[/cyan]")
     if public:
         rprint(f"   Registry: [cyan]{settings.registry_url}[/cyan] (public mode)")
+    if settings.public_url:
+        rprint(f"   Public: [cyan]{settings.public_url}[/cyan]")
     rprint(f"   Card:   [link]http://{host}:{server_port}/.well-known/agent.json[/link]")
     rprint(f"   Docs:   [link]http://{host}:{server_port}/docs[/link]")
     rprint()

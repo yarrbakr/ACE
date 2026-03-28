@@ -62,6 +62,10 @@ class AceSettings(BaseSettings):
         default=60.0,
         description="Seconds between heartbeats to the public registry",
     )
+    public_url: str = Field(
+        default="",
+        description="Externally reachable URL for this agent (used in agent card with --public)",
+    )
 
     @model_validator(mode="before")
     @classmethod
@@ -100,6 +104,7 @@ def write_default_config(
     discovery_mode: str = "centralized",
     seed_peers: list[str] | None = None,
     registry_url: str = "http://localhost:9000",
+    public_url: str = "",
 ) -> Path:
     """Write a default config.yaml into the given ACE directory."""
     config_path = ace_dir / "config.yaml"
@@ -112,6 +117,8 @@ def write_default_config(
         "registry_url": registry_url,
         "data_dir": str(ace_dir / "data"),
     }
+    if public_url:
+        config_data["public_url"] = public_url
     if seed_peers:
         config_data["seed_peers"] = seed_peers
     config_path.write_text(yaml.dump(config_data, default_flow_style=False), encoding="utf-8")

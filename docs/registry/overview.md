@@ -22,7 +22,7 @@ The registry is designed to run anywhere:
 
 - **Locally**: `ace registry start` -- zero config, zero accounts
 - **On a VPS**: Docker or bare Python
-- **On a free cloud tier**: Render, Koyeb, Fly.io
+- **On a free cloud tier**: ClawCloud, Render, Fly.io
 
 No central authority required. Anyone can run a registry.
 
@@ -52,6 +52,6 @@ The registry uses SQLite (same as the agent itself). Two tables:
 - `registered_agents` -- agent cards with heartbeat timestamps
 - `registry_capabilities` -- searchable capability index (cascades on delete)
 
-## No Authentication (Phase 1)
+## Authentication
 
-The registry currently accepts open registration. Any agent can register or deregister any AID. Ed25519 signature verification will be added in a future phase so that only the key holder for an AID can manage its registration.
+All write endpoints (`/register`, `/deregister`, `/heartbeat`) require Ed25519 signature verification via `X-Agent-ID` and `X-Signature` headers. Only the key holder for an AID can manage its registration. Read endpoints (`/search`, `/agents`, `/health`) are open.

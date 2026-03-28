@@ -79,6 +79,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         registry_discovery = PublicRegistryDiscovery(
             settings.registry_url,
             heartbeat_interval=settings.heartbeat_interval,
+            identity=identity,
         )
         app.state.registry_discovery = registry_discovery
         app.state.discovery = registry_discovery
@@ -88,7 +89,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         card = {
             "name": settings.agent_name,
             "description": settings.agent_description,
-            "url": f"http://127.0.0.1:{settings.port}",
+            "url": settings.public_url or f"http://127.0.0.1:{settings.port}",
             "capabilities": [
                 {
                     "id": s["name"],
@@ -229,7 +230,7 @@ def create_app(
 
         aid = _identity.aid if _identity else _settings.aid
         public_key = _identity.public_key_b64 if _identity else ""
-        url = f"http://127.0.0.1:{_settings.port}"
+        url = _settings.public_url or f"http://127.0.0.1:{_settings.port}"
 
         return {
             "name": _settings.agent_name,

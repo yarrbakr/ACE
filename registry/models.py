@@ -2,28 +2,38 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+_MAX_AGENT_CARD_BYTES = 65_536  # 64 KB
 
 
 class RegisterAgentRequest(BaseModel):
     """Payload for POST /register."""
 
-    aid: str = Field(description="Agent ID")
+    aid: str = Field(description="Agent ID", max_length=256)
     agent_card: dict[str, Any] = Field(description="Full A2A agent card JSON")
+
+    @field_validator("agent_card")
+    @classmethod
+    def _card_size_limit(cls, v: dict[str, Any]) -> dict[str, Any]:
+        if len(json.dumps(v)) > _MAX_AGENT_CARD_BYTES:
+            raise ValueError("agent_card exceeds 64KB size limit")
+        return v
 
 
 class HeartbeatRequest(BaseModel):
     """Payload for POST /heartbeat."""
 
-    aid: str = Field(description="Agent ID")
+    aid: str = Field(description="Agent ID", max_length=256)
 
 
 class DeregisterRequest(BaseModel):
     """Payload for POST /deregister."""
 
-    aid: str = Field(description="Agent ID")
+    aid: str = Field(description="Agent ID", max_length=256)
 
 
 class SearchResponse(BaseModel):

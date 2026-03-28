@@ -104,8 +104,16 @@ registry/
 | Public Registry Service (`registry/`, `ace registry start`) | DONE | Phase 1 |
 | Registry Discovery Adapter (`PublicRegistryDiscovery`) | DONE | Phase 1 |
 | Auto-registration (`ace start --public`, heartbeat loop) | DONE | Phase 1 |
-| Docker deployment (Dockerfile + render.yaml) | DONE | Phase 1 |
+| Docker deployment (Dockerfile) | DONE | Phase 1 |
 | MkDocs documentation site | DONE | Phase 1 |
+| PyPI publish (`pip install agent-capability-exchange`) | DONE | Phase 2 |
+| Cloud registry deployment (ClawCloud) | TODO | Phase 2 |
+| Agent-to-Agent HTTP protocol | TODO | Phase 2 |
+| Distributed escrow & settlement | TODO | Phase 3 |
+| Cloud agent deployment guide | TODO | Phase 2 |
+| WebSocket relay (NAT traversal) | TODO | Phase 4 |
+| Reputation system | TODO | Phase 4 |
+| Web dashboard & SDK | TODO | Phase 4 |
 
 ## Key Patterns & Conventions
 
@@ -164,7 +172,7 @@ registry/
 - **Registry CLI**: `ace registry start` is a Typer subgroup (`app.add_typer(registry_app)`). Follows `ace start` pattern (Rich banner, uvicorn.run)
 - **Registry conditional lifespan**: In `server.py`, `elif settings.discovery_mode == DiscoveryMode.REGISTRY` branch creates PublicRegistryDiscovery, builds agent card, tries register (try/except for graceful failure)
 - **MockTransport testing**: Adapter tests use `httpx.MockTransport` to forward from async httpx client to sync TestClient. Requires TestClient as context manager for lifespan
-- **Render deployment**: `render.yaml` in repo root for one-click Render deploy (Docker, free tier, /health check, 1GB disk)
+- **ClawCloud deployment**: Docker image pushed to GHCR via CI, pulled by ClawCloud Run (free tier, Singapore region, manual redeploy)
 - **MkDocs docs**: `mkdocs.yml` with Material theme, nav structure. Docs in `docs/` folder. `mkdocs serve` for local preview, `mkdocs build --strict` in CI
 
 ## Test Structure
@@ -215,6 +223,8 @@ ruff check src/ registry/  # Lint
 mypy src/ace/              # Type check
 mkdocs serve               # Preview docs at http://localhost:8000
 python -m build            # Build wheel + sdist into dist/
+twine upload dist/*        # Publish to PyPI (uses PYPI_API_TOKEN from .env)
+pip install agent-capability-exchange  # Install from PyPI
 ```
 
 ## Makefile Targets
@@ -246,10 +256,13 @@ GitHub Actions workflow at `.github/workflows/ci.yml`:
 - **Dev extras**: `pip install -e ".[dev]"` — pytest, pytest-asyncio, pytest-cov, ruff, mypy, build, mkdocs, mkdocs-material
 - **Keywords**: ai, agents, currency, marketplace, capabilities, agent-to-agent, a2a, capability-exchange, agent-marketplace, escrow, ed25519
 - **Classifiers**: Alpha, Python 3.11/3.12/3.13, OS Independent, Typed
+- **PyPI**: Live at https://pypi.org/project/agent-capability-exchange/ (v0.1.0 published)
+- **Install**: `pip install agent-capability-exchange` — installs `ace` CLI globally
+- **API Token**: Project-scoped token stored in `.env` as `PYPI_API_TOKEN`. Upload via `python -m build && twine upload dist/* -u __token__ -p $PYPI_API_TOKEN`
 
 ## Development Roadmap (Steps in Documents/prompts.md)
 
-All 10 local steps + Phase 1 (Public Registry) are complete. The full step-by-step build plan with copy-paste prompts is in `Documents/prompts.md`. Enhanced versions of each step are in `Documents/step{N}_prompt_enhanced.md`. Global network roadmap is in `Documents/global_network_plan.md`.
+All 10 local steps + Phase 1 (Public Registry) are complete. PyPI publish (Phase 2 first task) is complete — package is live at https://pypi.org/project/agent-capability-exchange/0.1.0/. Next: cloud registry deployment, then Agent-to-Agent HTTP protocol. The full step-by-step build plan with copy-paste prompts is in `Documents/prompts.md`. Enhanced versions of each step are in `Documents/step{N}_prompt_enhanced.md`. Global network roadmap is in `Documents/global_network_plan.md`.
 
 ## Important Files for Each Step
 

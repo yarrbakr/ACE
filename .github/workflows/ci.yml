@@ -53,3 +53,29 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./site
+
+  deploy-registry:
+    runs-on: ubuntu-latest
+    needs: [test, lint]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      packages: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: registry/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/ace-registry:latest
+            ghcr.io/${{ github.repository_owner }}/ace-registry:${{ github.sha }}
+      # ClawCloud pulls from GHCR — redeploy manually via dashboard after push

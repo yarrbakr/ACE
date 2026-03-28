@@ -15,8 +15,12 @@ WORKDIR /app
 COPY --from=builder /install /usr/local
 COPY registry/ registry/
 
-# Create data directory for SQLite
-RUN mkdir -p /data
+# Create non-root user and data directory
+RUN useradd -m -s /bin/bash ace && \
+    mkdir -p /data /tmp && \
+    chown -R ace:ace /data /tmp /app
+
+USER ace
 
 ENV ACE_REGISTRY_DB=/data/registry.db
 ENV PORT=9000

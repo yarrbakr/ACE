@@ -453,9 +453,9 @@ docker build -f registry/Dockerfile -t ace-registry .
 docker run -d -p 9000:9000 -v ace-data:/data --name ace-registry ace-registry
 ```
 
-### Render (Free Tier)
+### ClawCloud (Free Tier)
 
-Push to GitHub and connect to [render.com](https://render.com). The included `render.yaml` auto-configures everything. See the [deployment docs](docs/registry/deployment.md) for Fly.io, Koyeb, and other providers.
+CI pushes Docker images to GHCR automatically. Deploy on [ClawCloud Run](https://run.claw.cloud) by pulling `ghcr.io/yarrbakr/ace-registry:latest` (port 9000). See the [deployment docs](docs/registry/deployment.md) for other providers.
 
 ## Documentation
 

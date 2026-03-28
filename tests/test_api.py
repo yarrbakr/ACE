@@ -143,6 +143,30 @@ class TestAgentCard:
         data = client.get("/.well-known/agent.json").json()
         assert "8080" in data["url"]
 
+    def test_agent_card_uses_public_url(
+        self, tmp_path: Path, buyer_identity: AgentIdentity
+    ) -> None:
+        """When public_url is set, agent card returns it instead of localhost."""
+        data_dir = tmp_path / "data2"
+        data_dir.mkdir()
+        settings = AceSettings(
+            agent_name="test-agent",
+            agent_description="A test agent",
+            port=8080,
+            data_dir=data_dir,
+            public_url="https://my-agent.example.com",
+        )
+        app = create_app(settings=settings, identity=buyer_identity)
+        with TestClient(app) as tc:
+            resp = tc.get("/.well-known/agent.json")
+            assert resp.status_code == 200
+            assert resp.json()["url"] == "https://my-agent.example.com"
+
+    def test_agent_card_falls_back_to_localhost(self, client: TestClient) -> None:
+        """When public_url is empty, agent card falls back to localhost:port."""
+        data = client.get("/.well-known/agent.json").json()
+        assert "127.0.0.1" in data["url"]
+
 
 # ── Health Check ────────────────────────────────────────────
 
