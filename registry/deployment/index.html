@@ -21,7 +21,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
@@ -536,15 +536,15 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#render-recommended" class="md-nav__link">
+  <a href="#clawcloud-run-recommended" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Render (Recommended)
+        ClawCloud Run (Recommended)
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Render (Recommended)">
+    <nav class="md-nav" aria-label="ClawCloud Run (Recommended)">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -552,17 +552,6 @@
     <span class="md-ellipsis">
       
         Setup
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#manual-setup" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Manual Setup
       
     </span>
   </a>
@@ -597,10 +586,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#koyeb" class="md-nav__link">
+  <a href="#render" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Koyeb
+        Render
       
     </span>
   </a>
@@ -699,15 +688,15 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#render-recommended" class="md-nav__link">
+  <a href="#clawcloud-run-recommended" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Render (Recommended)
+        ClawCloud Run (Recommended)
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Render (Recommended)">
+    <nav class="md-nav" aria-label="ClawCloud Run (Recommended)">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -715,17 +704,6 @@
     <span class="md-ellipsis">
       
         Setup
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#manual-setup" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Manual Setup
       
     </span>
   </a>
@@ -760,10 +738,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#koyeb" class="md-nav__link">
+  <a href="#render" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Koyeb
+        Render
       
     </span>
   </a>
@@ -814,51 +792,22 @@
 
 <h1 id="cloud-deployment">Cloud Deployment<a class="headerlink" href="#cloud-deployment" title="Permanent link">&para;</a></h1>
 <p>Deploy the ACE registry to a free cloud provider for global access.</p>
-<h2 id="render-recommended">Render (Recommended)<a class="headerlink" href="#render-recommended" title="Permanent link">&para;</a></h2>
-<p>Render offers a free tier with no credit card required.</p>
+<h2 id="clawcloud-run-recommended">ClawCloud Run (Recommended)<a class="headerlink" href="#clawcloud-run-recommended" title="Permanent link">&para;</a></h2>
+<p>ClawCloud Run offers a free plan ($5/mo credit), always-on containers, and Singapore region.</p>
 <h3 id="setup">Setup<a class="headerlink" href="#setup" title="Permanent link">&para;</a></h3>
 <ol>
-<li>Push your code to GitHub</li>
-<li>Go to <a href="https://render.com">render.com</a> and sign in with GitHub</li>
-<li>Click <strong>New &gt; Web Service</strong></li>
-<li>Connect your repository</li>
-<li>Render will auto-detect the <code>render.yaml</code> and configure everything</li>
+<li>Push to GitHub — CI builds and pushes the Docker image to GHCR automatically</li>
+<li>Go to <a href="https://run.claw.cloud">ClawCloud dashboard</a> and sign up</li>
+<li>Click <strong>App Launchpad</strong> &gt; <strong>Create App</strong></li>
+<li>Deploy from Docker Image:</li>
+<li><strong>Image:</strong> <code>ghcr.io/yarrbakr/ace-registry:latest</code></li>
+<li><strong>Port:</strong> <code>9000</code></li>
+<li><strong>Env vars:</strong> <code>PORT=9000</code>, <code>ACE_REGISTRY_DB=/tmp/registry.db</code></li>
+<li>After the first deploy, note the assigned URL (e.g., <code>https://&lt;your-app&gt;.run.claw.cloud</code>)</li>
 </ol>
-<h3 id="manual-setup">Manual Setup<a class="headerlink" href="#manual-setup" title="Permanent link">&para;</a></h3>
-<p>If you prefer manual configuration:</p>
-<table>
-<thead>
-<tr>
-<th>Setting</th>
-<th>Value</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Runtime</td>
-<td>Docker</td>
-</tr>
-<tr>
-<td>Dockerfile Path</td>
-<td><code>registry/Dockerfile</code></td>
-</tr>
-<tr>
-<td>Docker Context</td>
-<td><code>.</code></td>
-</tr>
-<tr>
-<td>Instance Type</td>
-<td>Free</td>
-</tr>
-<tr>
-<td>Health Check Path</td>
-<td><code>/health</code></td>
-</tr>
-</tbody>
-</table>
 <div class="admonition note">
-<p class="admonition-title">Free tier sleep</p>
-<p>Render's free tier sleeps after 15 minutes of inactivity. Use a free uptime monitor (e.g., Better Stack) to ping <code>/health</code> every 5 minutes to keep it awake.</p>
+<p class="admonition-title">Manual redeploy</p>
+<p>ClawCloud does not auto-redeploy when a new image is pushed to GHCR. After CI pushes a new image, click "Redeploy" in the ClawCloud dashboard.</p>
 </div>
 <h2 id="docker-any-provider">Docker (Any Provider)<a class="headerlink" href="#docker-any-provider" title="Permanent link">&para;</a></h2>
 <p>Build and run the registry container:</p>
@@ -882,26 +831,30 @@
 <a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="c1"># Deploy</span>
 <a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>fly<span class="w"> </span>deploy
 </code></pre></div>
-<h2 id="koyeb">Koyeb<a class="headerlink" href="#koyeb" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Install CLI</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://raw.githubusercontent.com/koyeb/koyeb-cli/master/install.sh<span class="w"> </span><span class="p">|</span><span class="w"> </span>sh
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="c1"># Deploy from Docker</span>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>koyeb<span class="w"> </span>deploy<span class="w"> </span>--app<span class="w"> </span>ace-registry<span class="w"> </span>--docker<span class="w"> </span>ace-registry:latest<span class="w"> </span>--port<span class="w"> </span><span class="m">9000</span>
+<h2 id="render">Render<a class="headerlink" href="#render" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Connect your GitHub repo at render.com</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="c1"># Configure manually:</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="c1">#   Runtime: Docker</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="c1">#   Dockerfile: registry/Dockerfile</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="c1">#   Health Check: /health</span>
 </code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Render free tier sleeps</p>
+<p>Render's free tier sleeps after 15 minutes of inactivity with ~2 min cold start.</p>
+</div>
 <h2 id="after-deployment">After Deployment<a class="headerlink" href="#after-deployment" title="Permanent link">&para;</a></h2>
-<p>Once your registry is deployed at <code>https://your-registry.onrender.com</code>:</p>
+<p>Once your registry is deployed at <code>https://your-registry.run.claw.cloud</code>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># Initialize agents to use it</span>
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>ace<span class="w"> </span>init<span class="w"> </span>--name<span class="w"> </span>my-agent<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span>--discovery<span class="w"> </span>registry<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span>--registry-url<span class="w"> </span>https://your-registry.onrender.com
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span>--registry-url<span class="w"> </span>https://your-registry.run.claw.cloud
 <a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>
 <a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="c1"># Start with auto-registration</span>
 <a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>ace<span class="w"> </span>start<span class="w"> </span>--public
 </code></pre></div>
 <h2 id="monitoring">Monitoring<a class="headerlink" href="#monitoring" title="Permanent link">&para;</a></h2>
 <p>Check your registry's health:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>curl<span class="w"> </span>https://your-registry.onrender.com/health
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>curl<span class="w"> </span>https://your-registry.run.claw.cloud/health
 </code></pre></div>
 <p>Response:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="p">{</span>

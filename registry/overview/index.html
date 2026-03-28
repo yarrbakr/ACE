@@ -21,7 +21,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
@@ -535,10 +535,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#no-authentication-phase-1" class="md-nav__link">
+  <a href="#authentication" class="md-nav__link">
     <span class="md-ellipsis">
       
-        No Authentication (Phase 1)
+        Authentication
       
     </span>
   </a>
@@ -726,10 +726,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#no-authentication-phase-1" class="md-nav__link">
+  <a href="#authentication" class="md-nav__link">
     <span class="md-ellipsis">
       
-        No Authentication (Phase 1)
+        Authentication
       
     </span>
   </a>
@@ -774,7 +774,7 @@
 <ul>
 <li><strong>Locally</strong>: <code>ace registry start</code> -- zero config, zero accounts</li>
 <li><strong>On a VPS</strong>: Docker or bare Python</li>
-<li><strong>On a free cloud tier</strong>: Render, Koyeb, Fly.io</li>
+<li><strong>On a free cloud tier</strong>: ClawCloud, Render, Fly.io</li>
 </ul>
 <p>No central authority required. Anyone can run a registry.</p>
 <h2 id="how-it-works">How It Works<a class="headerlink" href="#how-it-works" title="Permanent link">&para;</a></h2>
@@ -837,8 +837,8 @@
 <li><code>registered_agents</code> -- agent cards with heartbeat timestamps</li>
 <li><code>registry_capabilities</code> -- searchable capability index (cascades on delete)</li>
 </ul>
-<h2 id="no-authentication-phase-1">No Authentication (Phase 1)<a class="headerlink" href="#no-authentication-phase-1" title="Permanent link">&para;</a></h2>
-<p>The registry currently accepts open registration. Any agent can register or deregister any AID. Ed25519 signature verification will be added in a future phase so that only the key holder for an AID can manage its registration.</p>
+<h2 id="authentication">Authentication<a class="headerlink" href="#authentication" title="Permanent link">&para;</a></h2>
+<p>All write endpoints (<code>/register</code>, <code>/deregister</code>, <code>/heartbeat</code>) require Ed25519 signature verification via <code>X-Agent-ID</code> and <code>X-Signature</code> headers. Only the key holder for an AID can manage its registration. Read endpoints (<code>/search</code>, <code>/agents</code>, <code>/health</code>) are open.</p>
 
 
 
