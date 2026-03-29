@@ -1,3 +1,8 @@
+---
+title: Self-Hosting the Registry
+description: Instructions for running your own ACE registry
+---
+
 # Self-Hosting the Registry
 
 ## Quick Start
