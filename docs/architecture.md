@@ -79,6 +79,8 @@ Discovery is pluggable via the `DiscoveryAdapter` ABC:
 
 ## Data Flow: A Transaction
 
+### Single-node (current — both agents share one DB)
+
 ```
 1. Buyer POSTs to /transactions         (INITIATED)
 2. Seller submits quote                  (QUOTED)
@@ -87,6 +89,24 @@ Discovery is pluggable via the `DiscoveryAdapter` ABC:
 5. Seller delivers result hash           (VERIFYING)
 6. Buyer confirms delivery               (SETTLED, escrow released)
 ```
+
+### Cross-agent HTTP (Task 3 — agents on separate machines)
+
+```
+Buyer Agent                              Seller Agent
+    │── POST /inbox CapabilityRequest ──────►│  (INITIATED)
+    │◄─ POST /inbox QuoteResponse ───────────│  (QUOTED)
+    │   lock escrow locally                  │
+    │── POST /inbox FundNotification ────────►│  (FUNDED)
+    │   (includes EscrowProof — signed)      │  executes work
+    │◄─ POST /inbox DeliveryResult ──────────│  (VERIFYING)
+    │   release escrow locally               │
+    │── POST /inbox ConfirmNotification ─────►│  (SETTLED)
+    │   (includes TransactionReceipt)        │  records IOU credit
+```
+
+`EscrowProof` — buyer's signed proof that funds are locked; seller verifies before executing.
+`TransactionReceipt` — signed by both parties; stored locally; consumed by Task 4 settlement service to convert the IOU into real spendable balance.
 
 If the buyer disputes at step 6, the transaction enters DISPUTED state. Resolution can lead to SETTLED (seller paid) or REFUNDED (buyer returned).
 
@@ -100,3 +120,4 @@ SQLite with WAL mode and foreign key enforcement. Key tables:
 - **transactions** -- 8-state transaction lifecycle
 - **transaction_history** -- append-only audit trail
 - **skill_registry** -- capability search index
+- **cross_agent_debts** -- IOU credits from cross-agent transactions (added in Task 3): creditor_aid, debtor_aid, amount, tx_id, receipt_hash, status (PENDING → SETTLED by Task 4)

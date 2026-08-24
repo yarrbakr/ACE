@@ -9,12 +9,13 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Any
 
+import httpx
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from ace import __version__
 from ace.api.middleware import add_signature_middleware
-from ace.api.routes import admin, agent, discovery, transactions
+from ace.api.routes import admin, agent, discovery, inbox, transactions
 from ace.core.capability import CapabilityRegistry
 from ace.core.config import AceSettings, DiscoveryMode
 from ace.core.escrow import EscrowManager
@@ -126,6 +127,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await centralized._ensure_initialized()
         app.state.discovery = centralized
 
+    # Shared HTTP client for outbound cross-agent calls
+    http_client = httpx.AsyncClient(
+        timeout=httpx.Timeout(connect=5.0, read=30.0, write=10.0, pool=5.0),
+    )
+    app.state.http_client = http_client
+
     # Startup timestamp
     app.state.started_at = time.time()
 
@@ -133,6 +140,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     yield
 
     # Shutdown
+    await http_client.aclose()
     if registry_discovery is not None:
         if identity is not None:
             try:
@@ -185,6 +193,7 @@ def create_app(
 
     # Routes
     app.include_router(agent.router, prefix="/agents", tags=["agents"])
+    app.include_router(inbox.router, prefix="/agents", tags=["inbox"])
     app.include_router(transactions.router, prefix="/transactions", tags=["transactions"])
     app.include_router(discovery.router, prefix="/discovery", tags=["discovery"])
     app.include_router(admin.router, prefix="/admin", tags=["admin"])

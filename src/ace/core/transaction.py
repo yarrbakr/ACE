@@ -105,6 +105,7 @@ class Transaction(BaseModel):
     price: int = 0
     escrow_id: str | None = None
     result_hash: str | None = None
+    counterparty_url: str | None = None  # set for cross-agent transactions
     created_at: str
     updated_at: str
     timeout_at: str
@@ -220,8 +221,13 @@ class TransactionEngine:
         buyer_aid: str,
         seller_aid: str,
         capability_id: str,
+        seller_url: str | None = None,
     ) -> Transaction:
-        """Create a new transaction in INITIATED state."""
+        """Create a new transaction in INITIATED state.
+
+        Pass seller_url to mark this as a cross-agent transaction. The URL
+        is stored as counterparty_url and used for outbound HTTP calls.
+        """
         if buyer_aid == seller_aid:
             raise ValueError("Buyer and seller must be different agents")
         if not capability_id or not capability_id.strip():
@@ -233,8 +239,8 @@ class TransactionEngine:
         async with self._connect() as db:
             await db.execute(
                 "INSERT INTO transactions "
-                "(tx_id, state, buyer_aid, seller_aid, capability_id, timeout_at) "
-                "VALUES (?, ?, ?, ?, ?, ?)",
+                "(tx_id, state, buyer_aid, seller_aid, capability_id, timeout_at, counterparty_url) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
                 (
                     tx_id,
                     TransactionState.INITIATED.value,
@@ -242,6 +248,7 @@ class TransactionEngine:
                     seller_aid,
                     capability_id,
                     timeout_at,
+                    seller_url,
                 ),
             )
             await db.execute(
@@ -252,6 +259,121 @@ class TransactionEngine:
             )
             await db.commit()
 
+        return await self.get_transaction(tx_id)
+
+    async def create_mirror_transaction(
+        self,
+        tx_id: str,
+        buyer_aid: str,
+        seller_aid: str,
+        capability_id: str,
+        price: int,
+        buyer_url: str,
+    ) -> Transaction:
+        """Create seller-side mirror of a cross-agent transaction in QUOTED state.
+
+        Called from the inbox handler when a CapabilityRequest arrives.
+        Uses the buyer-supplied tx_id so both sides share the same ID.
+        Idempotent: raises sqlite3.IntegrityError if tx_id already exists.
+        """
+        timeout_at = self._compute_timeout(TransactionState.QUOTED)
+
+        async with self._connect() as db:
+            await db.execute(
+                "INSERT INTO transactions "
+                "(tx_id, state, buyer_aid, seller_aid, capability_id, price, "
+                "timeout_at, counterparty_url) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    tx_id,
+                    TransactionState.QUOTED.value,
+                    buyer_aid,
+                    seller_aid,
+                    capability_id,
+                    price,
+                    timeout_at,
+                    buyer_url,
+                ),
+            )
+            await db.execute(
+                "INSERT INTO transaction_history "
+                "(tx_id, from_state, to_state, actor_aid, note) "
+                "VALUES (?, NULL, ?, ?, ?)",
+                (
+                    tx_id,
+                    TransactionState.QUOTED.value,
+                    seller_aid,
+                    "Cross-agent mirror transaction created",
+                ),
+            )
+            await db.commit()
+
+        return await self.get_transaction(tx_id)
+
+    async def acknowledge_funded(self, tx_id: str, seller_aid: str) -> Transaction:
+        """Seller acknowledges buyer's EscrowProof. QUOTED → FUNDED (seller side).
+
+        Does NOT create an escrow — the escrow lives on the buyer's local ledger.
+        """
+        tx = await self.get_transaction(tx_id)
+        self._check_actor(seller_aid, tx.seller_aid, "acknowledge_funded")
+
+        await self._transition(
+            tx_id,
+            TransactionState.QUOTED,
+            TransactionState.FUNDED,
+            actor_aid=seller_aid,
+            note="Cross-agent: buyer escrow proof verified",
+        )
+        return await self.get_transaction(tx_id)
+
+    async def deliver_and_verify(
+        self, tx_id: str, seller_aid: str, result_hash: str
+    ) -> Transaction:
+        """Seller delivers result. FUNDED → EXECUTING → VERIFYING (chained, seller side)."""
+        if not result_hash or not result_hash.strip():
+            raise ValueError("result_hash must not be empty")
+
+        tx = await self.get_transaction(tx_id)
+        self._check_actor(seller_aid, tx.seller_aid, "deliver_and_verify")
+
+        await self._transition(
+            tx_id,
+            TransactionState.FUNDED,
+            TransactionState.EXECUTING,
+            actor_aid=seller_aid,
+            note="Cross-agent: auto-transition to executing",
+        )
+
+        async with self._connect() as db:
+            await db.execute(
+                "UPDATE transactions SET result_hash = ? WHERE tx_id = ?",
+                (result_hash, tx_id),
+            )
+            await db.commit()
+
+        await self._transition(
+            tx_id,
+            TransactionState.EXECUTING,
+            TransactionState.VERIFYING,
+            actor_aid=seller_aid,
+            note=f"Cross-agent: result delivered: {result_hash}",
+        )
+        return await self.get_transaction(tx_id)
+
+    async def settle_with_iou(self, tx_id: str, actor_aid: str) -> Transaction:
+        """Transition VERIFYING → SETTLED for cross-agent IOU path.
+
+        Used by both buyer side (from confirm_delivery handler) and seller side
+        (from ConfirmNotification inbox handler after IOU is recorded).
+        """
+        await self._transition(
+            tx_id,
+            TransactionState.VERIFYING,
+            TransactionState.SETTLED,
+            actor_aid=actor_aid,
+            note="Cross-agent: settled via IOU",
+        )
         return await self.get_transaction(tx_id)
 
     async def submit_quote(self, tx_id: str, price: int, seller_aid: str) -> Transaction:
@@ -348,7 +470,11 @@ class TransactionEngine:
         return await self.get_transaction(tx_id)
 
     async def confirm_delivery(self, tx_id: str, buyer_aid: str) -> Transaction:
-        """Buyer confirms delivery, releases escrow. VERIFYING → SETTLED."""
+        """Buyer confirms delivery, releases escrow. VERIFYING → SETTLED.
+
+        For cross-agent transactions (counterparty_url set), escrow is released
+        to SYSTEM:IOUS instead of the remote seller. The IOU records the debt.
+        """
         tx = await self.get_transaction(tx_id)
         self._check_actor(buyer_aid, tx.buyer_aid, "confirm_delivery")
 
@@ -361,7 +487,10 @@ class TransactionEngine:
         )
 
         if tx.escrow_id:
-            await self._escrow.release_escrow(tx.escrow_id)
+            if tx.counterparty_url:
+                await self._escrow.release_to_ious(tx.escrow_id)
+            else:
+                await self._escrow.release_escrow(tx.escrow_id)
 
         return await self.get_transaction(tx_id)
 
@@ -440,7 +569,8 @@ class TransactionEngine:
         async with self._connect() as db:
             cursor = await db.execute(
                 "SELECT tx_id, state, buyer_aid, seller_aid, capability_id, "
-                "price, escrow_id, result_hash, created_at, updated_at, timeout_at "
+                "price, escrow_id, result_hash, counterparty_url, "
+                "created_at, updated_at, timeout_at "
                 "FROM transactions WHERE tx_id = ?",
                 (tx_id,),
             )
@@ -475,6 +605,7 @@ class TransactionEngine:
             price=row["price"],
             escrow_id=row["escrow_id"],
             result_hash=row["result_hash"],
+            counterparty_url=row["counterparty_url"],
             created_at=row["created_at"],
             updated_at=row["updated_at"],
             timeout_at=row["timeout_at"],

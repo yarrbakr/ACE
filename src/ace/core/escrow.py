@@ -11,7 +11,7 @@ from datetime import UTC, datetime, timedelta
 import aiosqlite
 
 from ace.core.exceptions import InvalidEscrowStateError
-from ace.core.ledger import SYSTEM_ESCROW, Ledger
+from ace.core.ledger import SYSTEM_ESCROW, SYSTEM_IOUS, Ledger
 
 MAX_TIMEOUT_SECONDS = 604_800  # 7 days
 
@@ -113,6 +113,22 @@ class EscrowManager:
             amount,
             description=f"Escrow refund: {amount} AGC",
             entry_type="ESCROW_REFUND",
+        )
+
+    async def release_to_ious(self, escrow_id: str) -> None:
+        """Release escrowed funds to SYSTEM:IOUS (cross-agent IOU path). LOCKED -> RELEASED.
+
+        Used instead of release_escrow() when the seller is remote. Funds are
+        held in SYSTEM:IOUS until the Task 4 settlement service converts them
+        into spendable balance for the seller.
+        """
+        _, amount = await self._transition(escrow_id, "RELEASED")
+        await self._ledger.transfer(
+            SYSTEM_ESCROW,
+            SYSTEM_IOUS,
+            amount,
+            description=f"IOU commitment: escrow {escrow_id}",
+            entry_type="IOU_COMMITMENT",
         )
 
     async def get_escrow(self, escrow_id: str) -> Escrow:

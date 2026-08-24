@@ -35,6 +35,7 @@ INSERT OR IGNORE INTO accounts (aid, balance) VALUES ('SYSTEM:ISSUANCE', 0);
 INSERT OR IGNORE INTO accounts (aid, balance) VALUES ('SYSTEM:ESCROW', 0);
 INSERT OR IGNORE INTO accounts (aid, balance) VALUES ('SYSTEM:BURN', 0);
 INSERT OR IGNORE INTO accounts (aid, balance) VALUES ('SYSTEM:FEES', 0);
+INSERT OR IGNORE INTO accounts (aid, balance) VALUES ('SYSTEM:IOUS', 0);
 
 -- ─── Ledger entries (double-entry bookkeeping) ─────────────────────────────
 -- Each transfer creates TWO entries: one DEBIT (sender) and one CREDIT (receiver).
@@ -50,7 +51,7 @@ CREATE TABLE IF NOT EXISTS ledger_entries (
     balance_after   INTEGER NOT NULL,
     entry_type      TEXT NOT NULL CHECK (entry_type IN (
         'ISSUANCE', 'TRANSFER', 'FEE', 'BURN',
-        'ESCROW_LOCK', 'ESCROW_RELEASE', 'ESCROW_REFUND'
+        'ESCROW_LOCK', 'ESCROW_RELEASE', 'ESCROW_REFUND', 'IOU_COMMITMENT'
     )),
     description     TEXT NOT NULL DEFAULT ''
 );
@@ -96,20 +97,21 @@ CREATE INDEX IF NOT EXISTS idx_capabilities_name ON capabilities(name);
 -- ─── Transactions (8-state capability trade lifecycle) ──────────────────────
 
 CREATE TABLE IF NOT EXISTS transactions (
-    tx_id           TEXT PRIMARY KEY,
-    state           TEXT NOT NULL DEFAULT 'INITIATED' CHECK (state IN (
+    tx_id               TEXT PRIMARY KEY,
+    state               TEXT NOT NULL DEFAULT 'INITIATED' CHECK (state IN (
         'INITIATED', 'QUOTED', 'FUNDED', 'EXECUTING',
         'VERIFYING', 'SETTLED', 'DISPUTED', 'REFUNDED'
     )),
-    buyer_aid       TEXT NOT NULL,
-    seller_aid      TEXT NOT NULL,
-    capability_id   TEXT NOT NULL,
-    price           INTEGER NOT NULL DEFAULT 0,
-    escrow_id       TEXT,
-    result_hash     TEXT,
-    created_at      TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
-    timeout_at      TEXT NOT NULL,
+    buyer_aid           TEXT NOT NULL,
+    seller_aid          TEXT NOT NULL,
+    capability_id       TEXT NOT NULL,
+    price               INTEGER NOT NULL DEFAULT 0,
+    escrow_id           TEXT,
+    result_hash         TEXT,
+    counterparty_url    TEXT,
+    created_at          TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at          TEXT NOT NULL DEFAULT (datetime('now')),
+    timeout_at          TEXT NOT NULL,
     CHECK (buyer_aid != seller_aid)
 );
 
@@ -131,3 +133,21 @@ CREATE TABLE IF NOT EXISTS transaction_history (
 );
 
 CREATE INDEX IF NOT EXISTS idx_tx_history ON transaction_history(tx_id, timestamp);
+
+-- ─── Cross-agent IOU debts (Option A settlement bridge) ──────────────────────
+-- Records IOUs owed from buyer to seller after cross-agent transaction settlement.
+-- Status: PENDING (not yet settled) -> SETTLED (Task 4 settlement service).
+
+CREATE TABLE IF NOT EXISTS cross_agent_debts (
+    debt_id         TEXT PRIMARY KEY,
+    creditor_aid    TEXT NOT NULL,               -- seller: party owed money
+    debtor_aid      TEXT NOT NULL,               -- buyer: party that owes money
+    amount          INTEGER NOT NULL CHECK (amount > 0),
+    tx_id           TEXT NOT NULL UNIQUE,        -- one IOU per transaction
+    receipt_hash    TEXT NOT NULL,               -- sha256 of TransactionReceipt signable bytes
+    status          TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'SETTLED')),
+    created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_debts_creditor ON cross_agent_debts(creditor_aid);
+CREATE INDEX IF NOT EXISTS idx_debts_debtor   ON cross_agent_debts(debtor_aid);

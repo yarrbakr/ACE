@@ -31,17 +31,18 @@ registry/        <- Standalone public registry service (FastAPI + SQLite)
 
 ```
 src/ace/
-  __init__.py              # Package root, exports __version__ = "0.1.0"
+  __init__.py              # Package root, exports __version__ = "0.1.1"
   core/
     __init__.py            # Exports: config, exceptions, identity, ledger, escrow, capability, transaction
     config.py              # AceSettings (Pydantic), load_settings(), ensure_ace_dir(), write_default_config()
     exceptions.py          # ACEError hierarchy: InsufficientBalanceError, AccountNotFoundError, InvalidEscrowStateError, InvalidTransitionError, UnauthorizedActionError, ConfigNotFoundError, SkillParseError, DecryptionError
     identity.py            # AgentIdentity class: Ed25519 keygen, AID derivation (sha256->b32), sign/verify, encrypted save/load (Fernet+PBKDF2)
-    ledger.py              # Ledger class: double-entry bookkeeping, transfer(), mint(), get_balance(), get_transaction_history(). Uses aiosqlite. System accounts: SYSTEM:ISSUANCE, SYSTEM:ESCROW, SYSTEM:BURN, SYSTEM:FEES. transfer() accepts optional entry_type param.
-    escrow.py              # EscrowManager class + Escrow dataclass. create_escrow(), release_escrow(), refund_escrow(), get_escrow(), check_expired_escrows(). DI: takes Ledger in constructor. Atomic state transitions via UPDATE...WHERE state='LOCKED'.
+    ledger.py              # Ledger class: double-entry bookkeeping, transfer(), mint(), get_balance(), get_transaction_history(). Uses aiosqlite. System accounts: SYSTEM:ISSUANCE, SYSTEM:ESCROW, SYSTEM:BURN, SYSTEM:FEES, SYSTEM:IOUS. transfer() accepts optional entry_type param. Cross-agent: record_iou(), get_iou_debts(), IOUDebt dataclass.
+    escrow.py              # EscrowManager class + Escrow dataclass. create_escrow(), release_escrow(), refund_escrow(), release_to_ious(), get_escrow(), check_expired_escrows(). DI: takes Ledger in constructor. Atomic state transitions via UPDATE...WHERE state='LOCKED'. release_to_ious() used in cross-agent confirm to release escrow to SYSTEM:IOUS instead of seller.
     capability.py          # SkillPricing, SkillDefinition (Pydantic v2), SkillParser (YAML frontmatter via safe_load), generate_agent_card() (A2A protocol), CapabilityRegistry (SQLite + in-memory cache: register, unregister, search, get_agent_card, list_skills)
-    transaction.py         # TransactionState(str, Enum) 8 states, Transaction(Pydantic), VALID_TRANSITIONS dict, TransactionEngine (DI: Ledger+EscrowManager, _transition choke point, authorization checks), TimeoutMonitor (asyncio background task)
-    schema.sql             # SQLite schema: accounts, ledger_entries, agents, escrows, capabilities, transactions (8-state), transaction_history (audit trail)
+    transaction.py         # TransactionState(str, Enum) 8 states, Transaction(Pydantic + counterparty_url field), VALID_TRANSITIONS dict, TransactionEngine (DI: Ledger+EscrowManager, _transition choke point, authorization checks), TimeoutMonitor (asyncio background task). Cross-agent methods: create_mirror_transaction(), acknowledge_funded(), deliver_and_verify(), settle_with_iou()
+    schema.sql             # SQLite schema: accounts, ledger_entries, agents, escrows, capabilities, transactions (8-state), transaction_history (audit trail), cross_agent_debts (IOU credits)
+    protocol.py            # Cross-agent wire format: EscrowProof, TransactionReceipt, canonical_json(), InboxMessage types (CapabilityRequest, FundNotification, ConfirmNotification, etc.)
   cli/
     main.py                # Typer app. Entry point: ace = "ace.cli.main:app". Commands: init, start, balance, transfer, mint, register-skill, search, skills, status, registry. Registry is a Typer subgroup via add_typer()
     commands/
@@ -52,15 +53,16 @@ src/ace/
       skills.py            # ace register-skill (parse + validate + copy to ~/.ace/skills/), ace search (Rich table), ace skills (list registered)
       status.py            # ace status: calls GET /admin/status via httpx, handles connection refused gracefully
   api/
-    server.py              # create_app() FastAPI factory. Lifespan initializes Ledger, EscrowManager, TransactionEngine, CapabilityRegistry, TimeoutMonitor, GossipDiscovery (when discovery_mode=gossip), and PublicRegistryDiscovery (when discovery_mode=registry). CORS + signature middleware. Routes: /agents, /transactions, /discovery, /admin, /gossip (gossip mode only). Health at /health. Agent Card at /.well-known/agent.json
+    server.py              # create_app() FastAPI factory. Lifespan initializes Ledger, EscrowManager, TransactionEngine, CapabilityRegistry, TimeoutMonitor, httpx.AsyncClient, GossipDiscovery (when discovery_mode=gossip), and PublicRegistryDiscovery (when discovery_mode=registry). CORS + signature middleware. Routes: /agents (includes /agents/inbox), /transactions, /discovery, /admin, /gossip (gossip mode only). Health at /health. Agent Card at /.well-known/agent.json
     middleware.py           # SignatureVerificationMiddleware (BaseHTTPMiddleware): Ed25519 sig verification on POST/PUT/DELETE. GET/HEAD/OPTIONS pass through. Resolves public key via local identity or agents table
-    models.py              # Pydantic v2 request/response models: ErrorResponse, CreateTransactionRequest, SubmitQuoteRequest, DeliverResultRequest, DisputeRequest, TransactionResponse, TransactionListResponse, RegisterCapabilityRequest, CapabilitySearchResponse, BalanceResponse, HistoryResponse, StatusResponse, AgentCardResponse
-    deps.py                # DI via Depends(): get_settings(), get_ledger(), get_escrow_manager(), get_transaction_engine(), get_capability_registry(), get_identity(). All pull from request.app.state
+    models.py              # Pydantic v2 request/response models: ErrorResponse, CreateTransactionRequest (+ seller_url), SubmitQuoteRequest, DeliverResultRequest, DisputeRequest, TransactionResponse, TransactionListResponse, RegisterCapabilityRequest, CapabilitySearchResponse, BalanceResponse, HistoryResponse, StatusResponse, AgentCardResponse, IOUDebtEntry, IOUDebtsResponse
+    deps.py                # DI via Depends(): get_settings(), get_ledger(), get_escrow_manager(), get_transaction_engine(), get_capability_registry(), get_identity(), get_http_client(). All pull from request.app.state
     routes/
       agent.py             # POST /agents/register (upserts agents table + registry), GET /agents/{aid} (lookup agent card)
-      transactions.py      # Full 8-state lifecycle: POST / (create), POST /{tx_id}/quote, /accept, /deliver, /confirm, /dispute. GET /{tx_id}, GET / (list with role/state filters)
+      inbox.py             # POST /agents/inbox — seller-side cross-agent message handler: CAPABILITY_REQUEST (create mirror tx + quote), FUND_NOTIFICATION (verify EscrowProof + auto-deliver), CONFIRM_NOTIFICATION (record IOU + settle)
+      transactions.py      # Full 8-state lifecycle: POST / (create), POST /{tx_id}/quote, /accept, /deliver, /confirm, /dispute. GET /{tx_id}, GET / (list with role/state filters). Cross-agent helpers: _initiate_cross_agent_request(), _send_fund_notification(), _send_confirm_notification()
       discovery.py         # GET /search (keyword + max_price filter), POST /capabilities (register skill), GET /agents (list all)
-      admin.py             # GET /balance, /history, /status — localhost-only (127.0.0.1, ::1, testclient guard). Status includes discovery_mode, known_peers, seed_peers
+      admin.py             # GET /balance, /history, /status, /debts — localhost-only (127.0.0.1, ::1, testclient guard). /debts returns IOU debt list for local agent
       gossip.py            # POST /gossip/exchange (signed peer list exchange), GET /gossip/peers (bootstrap), POST /gossip/announce (self-announce), POST /gossip/leave (graceful departure). Only mounted when discovery_mode=gossip. Rate-limited, signature-verified
   discovery/
     base.py                # DiscoveryAdapter ABC: register(), deregister(), search(), get_agent(), list_agents()
@@ -71,7 +73,7 @@ src/ace/
     public_registry.py     # PublicRegistryDiscovery(DiscoveryAdapter): HTTP client adapter for public registry. httpx.AsyncClient, background heartbeat loop via asyncio.create_task(), register/deregister/search/list via registry REST API
 
 registry/
-  __init__.py              # Package root, __version__ = "0.1.0"
+  __init__.py              # Package root, __version__ = "0.1.1"
   schema.sql               # SQLite schema: registered_agents (with heartbeat_at), registry_capabilities (CASCADE delete). WAL mode, FK enforcement, indexes on name/price/heartbeat
   models.py                # Pydantic v2 models: RegisterAgentRequest, HeartbeatRequest, DeregisterRequest, SearchResponse, AgentListResponse, RegistryStatsResponse
   store.py                 # RegistryStore class: aiosqlite + in-memory cache. Pattern follows CapabilityRegistry. Methods: initialize(), register_agent() (upsert via ON CONFLICT), deregister_agent(), heartbeat(), get_agent(), search() (OR-matching with JOIN), list_agents(), prune_stale(), agent_count()
@@ -107,8 +109,8 @@ registry/
 | Docker deployment (Dockerfile) | DONE | Phase 1 |
 | MkDocs documentation site | DONE | Phase 1 |
 | PyPI publish (`pip install agent-capability-exchange`) | DONE | Phase 2 |
-| Cloud registry deployment (ClawCloud) | TODO | Phase 2 |
-| Agent-to-Agent HTTP protocol | TODO | Phase 2 |
+| Cloud registry deployment (ClawCloud) | DONE | Phase 2 |
+| Agent-to-Agent HTTP protocol | DONE | Phase 2 |
 | Distributed escrow & settlement | TODO | Phase 3 |
 | Cloud agent deployment guide | TODO | Phase 2 |
 | WebSocket relay (NAT traversal) | TODO | Phase 4 |
@@ -127,7 +129,7 @@ registry/
 - **DB location**: `~/.ace/data/ace.db`
 - **Env overrides**: All settings support `ACE_` prefix env vars (e.g., `ACE_PORT=9090`)
 - **Port/adapter pattern**: Discovery is pluggable via `DiscoveryAdapter` ABC
-- **Entry types**: ISSUANCE, TRANSFER, FEE, BURN, ESCROW_LOCK, ESCROW_RELEASE, ESCROW_REFUND
+- **Entry types**: ISSUANCE, TRANSFER, FEE, BURN, ESCROW_LOCK, ESCROW_RELEASE, ESCROW_REFUND, IOU_COMMITMENT
 - **Escrow states**: LOCKED -> RELEASED (seller paid) | REFUNDED (buyer returned). Terminal states are immutable.
 - **Escrow atomicity**: State transitions use `UPDATE ... WHERE state = 'LOCKED'` + rowcount check to prevent double-release/refund
 - **Escrow DI**: EscrowManager takes Ledger as constructor arg, uses `ledger._db_path` for its own connections
@@ -173,7 +175,22 @@ registry/
 - **Registry conditional lifespan**: In `server.py`, `elif settings.discovery_mode == DiscoveryMode.REGISTRY` branch creates PublicRegistryDiscovery, builds agent card, tries register (try/except for graceful failure)
 - **MockTransport testing**: Adapter tests use `httpx.MockTransport` to forward from async httpx client to sync TestClient. Requires TestClient as context manager for lifespan
 - **ClawCloud deployment**: Docker image pushed to GHCR via CI, pulled by ClawCloud Run (free tier, Singapore region, manual redeploy)
-- **MkDocs docs**: `mkdocs.yml` with Material theme, nav structure. Docs in `docs/` folder. `mkdocs serve` for local preview, `mkdocs build --strict` in CI
+- **MkDocs docs**: `mkdocs.yml` with Material theme, nav structure. Docs in `docs/` folder. `mkdocs serve` for local preview, `mkdocs build --strict` in CI. MkDocs doc pages require YAML front matter (`title`, `description`) to avoid `NoneType` errors in Material theme plugins
+- **Live registry URL**: `https://namdvhxjugux.ap-southeast-1.clawcloudrun.com` — ClawCloud Run, Singapore, free plan. Default for `--registry-url` in `ace init`, `registry_url` in `AceSettings`, and `write_default_config()`
+- **Registry signature verification**: All write endpoints (`/register`, `/heartbeat`, `/deregister`) require `X-Agent-ID` + `X-Signature` Ed25519 headers. Public key for `/register` extracted from `agent_card.authentication.public_key`; for heartbeat/deregister looked up from stored agent card
+- **Registry rate limiting**: POST endpoints 10/min per IP, GET endpoints 60/min per IP. Returns 429. Reuses pattern from `src/ace/api/routes/gossip.py`
+- **Registry size limits**: `aid` max 256 chars, `agent_card` max 64KB (Pydantic `@field_validator`). Returns 422
+- **Adapter request signing**: `PublicRegistryDiscovery` accepts `identity: AgentIdentity | None`. When set, signs all POST bodies and adds `X-Agent-ID` + `X-Signature` headers. Passed from `server.py` lifespan
+- **Heartbeat re-registration**: `PublicRegistryDiscovery` stores `_agent_card` on `register()`. If `POST /heartbeat` returns 404, calls `register(_agent_card)` again. Survives registry redeploys with ephemeral storage
+- **public_url field**: `AceSettings.public_url` (env: `ACE_PUBLIC_URL`) used in agent card instead of `127.0.0.1`. Falls back to localhost when empty. Set via `--public-url` flag on `ace start`
+- **Cross-agent inbox**: `POST /agents/inbox` receives `InboxMessage` with `message_type` + `payload`. Three message types: `CAPABILITY_REQUEST` (seller creates mirror tx + returns quote), `FUND_NOTIFICATION` (seller verifies `EscrowProof` + auto-delivers), `CONFIRM_NOTIFICATION` (seller records IOU + marks SETTLED)
+- **EscrowProof**: Pydantic model signed by buyer's Ed25519 key over `canonical_json` (sort_keys=True) of all fields except `signature`. Seller verifies before executing work. Included in `FundNotification` payload.
+- **TransactionReceipt**: Pydantic model signed by buyer. Sent in `ConfirmNotification`. Seller stores `sha256(signable_bytes())` as `receipt_hash` in `cross_agent_debts`. Consumed by Task 4 settlement service.
+- **canonical_json**: `json.dumps(data, separators=(",",":"), sort_keys=True).encode("utf-8")` — used for all cross-agent signing to ensure deterministic byte representation
+- **Mirror transaction**: `create_mirror_transaction()` inserts seller-side tx copy directly in QUOTED state using buyer's `tx_id`. Bypasses normal INITIATED→QUOTED flow since inbox handler IS the seller.
+- **Placeholder account**: When buyer creates cross-agent tx, remote seller's AID gets a zero-balance local account (required by escrow FK constraint). Created via `contextlib.suppress(Exception)` around `ledger.create_account()`.
+- **IOU commitment flow**: On buyer confirm, `confirm_delivery()` calls `release_to_ious()` (escrow → `SYSTEM:IOUS`) when `tx.counterparty_url` is set. Seller inbox handler calls `ledger.record_iou()` with `contextlib.suppress(IntegrityError)` for idempotency.
+- **cross_agent_debts table**: creditor_aid, debtor_aid, amount, tx_id (UNIQUE), receipt_hash, status (PENDING/SETTLED). Indexed on creditor_aid + debtor_aid. PENDING until Task 4 settlement converts to real balance.
 
 ## Test Structure
 
@@ -190,6 +207,7 @@ tests/
   test_gossip.py           # 43 tests: PeerManager unit tests (22: add/remove/merge/prune/search), GossipDiscovery integration (13: lifecycle/adapter/crypto/self-loop), API endpoint tests (6: exchange/peers/announce/leave/centralized-guard), Status with gossip (2)
   test_public_registry.py  # 9 tests: adapter integration via MockTransport+TestClient, register+search, register+list, deregister, heartbeat lifecycle, max_price filter, not found
   test_registry_cli.py     # 5 tests: registry subcommand in help, registry start --help options, --public flag in start help, --registry-url in init help, "registry" in discovery modes
+  test_cross_agent.py      # 9 tests: full cross-agent lifecycle, buyer/seller settled state, escrow→IOUS (not seller), IOU recorded, receipt hash, admin /debts endpoint, bad EscrowProof signature rejected (403), local tx unaffected. Uses httpx.MockTransport to wire two TestClient instances.
 
 registry/tests/
   conftest.py              # Fixtures: registry_db(tmp_path), registry_client (TestClient with lifespan context manager), SAMPLE_AGENT_CARD, SAMPLE_AGENT_CARD_2
@@ -256,13 +274,13 @@ GitHub Actions workflow at `.github/workflows/ci.yml`:
 - **Dev extras**: `pip install -e ".[dev]"` — pytest, pytest-asyncio, pytest-cov, ruff, mypy, build, mkdocs, mkdocs-material
 - **Keywords**: ai, agents, currency, marketplace, capabilities, agent-to-agent, a2a, capability-exchange, agent-marketplace, escrow, ed25519
 - **Classifiers**: Alpha, Python 3.11/3.12/3.13, OS Independent, Typed
-- **PyPI**: Live at https://pypi.org/project/agent-capability-exchange/ (v0.1.0 published)
+- **PyPI**: Live at https://pypi.org/project/agent-capability-exchange/ (v0.1.1 published — includes all registry security hardening + ClawCloud defaults)
 - **Install**: `pip install agent-capability-exchange` — installs `ace` CLI globally
 - **API Token**: Project-scoped token stored in `.env` as `PYPI_API_TOKEN`. Upload via `python -m build && twine upload dist/* -u __token__ -p $PYPI_API_TOKEN`
 
 ## Development Roadmap (Steps in Documents/prompts.md)
 
-All 10 local steps + Phase 1 (Public Registry) are complete. PyPI publish (Phase 2 first task) is complete — package is live at https://pypi.org/project/agent-capability-exchange/0.1.0/. Next: cloud registry deployment, then Agent-to-Agent HTTP protocol. The full step-by-step build plan with copy-paste prompts is in `Documents/prompts.md`. Enhanced versions of each step are in `Documents/step{N}_prompt_enhanced.md`. Global network roadmap is in `Documents/global_network_plan.md`.
+All 10 local steps + Phase 1 (Public Registry) + Phase 2 (Agent-to-Agent HTTP protocol, Task 3) are complete. Cloud registry is deployed to ClawCloud Run at `https://namdvhxjugux.ap-southeast-1.clawcloudrun.com`. v0.1.1 published to PyPI with all security hardening. **Task 3 complete (2026-03-30): Option A (IOUs).** Wire protocol implemented in `src/ace/core/protocol.py`; inbox handler in `src/ace/api/routes/inbox.py`; 9 cross-agent integration tests in `tests/test_cross_agent.py`. 298 tests passing. **Now building: Task 4 (Distributed Escrow & Settlement)** — converts IOUs into spendable balance via a settlement service on the registry. See `Documents/roadmap.md` Task 4 for full subtask breakdown. The full step-by-step build plan with copy-paste prompts is in `Documents/prompts.md`. Enhanced versions of each step are in `Documents/step{N}_prompt_enhanced.md`. Global network roadmap is in `Documents/global_network_plan.md`.
 
 ## Important Files for Each Step
 
@@ -274,3 +292,4 @@ All 10 local steps + Phase 1 (Public Registry) are complete. PyPI publish (Phase
 - **Step 9 (Package & Publish)**: `README.md` (full rewrite), `.github/workflows/ci.yml`, `Makefile`, `pyproject.toml` (classifiers, keywords, package-data for schema.sql), `.gitignore` (.env, *.db, coverage.xml)
 - **Step 10 (Gossip Discovery)**: `src/ace/discovery/gossip_models.py` (new), `src/ace/discovery/peer_manager.py` (new), `src/ace/discovery/gossip.py` (replaced stub), `src/ace/api/routes/gossip.py` (new), `src/ace/api/server.py` (modified: conditional gossip adapter + routes), `src/ace/core/config.py` (modified: seed_peers, gossip_interval, gossip_fanout fields), `src/ace/cli/commands/init.py` (modified: --discovery, --seed-peers), `src/ace/cli/commands/status.py` (modified: gossip info), `src/ace/api/routes/admin.py` (modified: gossip fields in status), `src/ace/api/models.py` (modified: StatusResponse gossip fields), `tests/test_gossip.py` (new), `examples/gossip_demo.py` (new)
 - **Phase 1 (Public Registry)**: `registry/__init__.py`, `registry/schema.sql`, `registry/models.py`, `registry/store.py`, `registry/routes.py`, `registry/app.py`, `registry/__main__.py`, `registry/Dockerfile`, `registry/.dockerignore` (all new). `registry/tests/conftest.py`, `registry/tests/test_store.py`, `registry/tests/test_routes.py` (new tests). `src/ace/discovery/public_registry.py` (new adapter). `src/ace/cli/commands/registry.py` (new CLI). `src/ace/core/config.py` (modified: DiscoveryMode.REGISTRY, heartbeat_interval). `src/ace/api/server.py` (modified: registry discovery lifespan). `src/ace/cli/main.py` (modified: registry subgroup). `src/ace/cli/commands/start.py` (modified: --public flag). `src/ace/cli/commands/init.py` (modified: --registry-url). `tests/test_public_registry.py`, `tests/test_registry_cli.py` (new tests). `render.yaml`, `mkdocs.yml`, `docs/` folder (new deployment + docs). `pyproject.toml`, `.github/workflows/ci.yml` (modified: packaging + CI)
+- **Phase 2 (Agent-to-Agent HTTP, Task 3)**: `src/ace/core/protocol.py` (new: EscrowProof, TransactionReceipt, canonical_json, InboxMessage types). `src/ace/api/routes/inbox.py` (new: POST /agents/inbox seller-side handler). `tests/test_cross_agent.py` (new: 9 integration tests). `src/ace/core/schema.sql` (modified: cross_agent_debts table, SYSTEM:IOUS account, IOU_COMMITMENT entry type). `src/ace/core/ledger.py` (modified: record_iou, get_iou_debts, IOUDebt, SYSTEM_IOUS). `src/ace/core/escrow.py` (modified: release_to_ious). `src/ace/core/transaction.py` (modified: counterparty_url, create_mirror_transaction, acknowledge_funded, deliver_and_verify, settle_with_iou). `src/ace/api/routes/transactions.py` (modified: cross-agent buyer-side flows). `src/ace/api/routes/admin.py` (modified: GET /admin/debts). `src/ace/api/server.py` (modified: inbox router mount, httpx.AsyncClient). `src/ace/api/models.py` (modified: seller_url, IOUDebtEntry, IOUDebtsResponse). `src/ace/api/deps.py` (modified: get_http_client)

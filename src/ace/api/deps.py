@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import httpx
 from fastapi import Request
 
 if TYPE_CHECKING:
@@ -49,6 +50,11 @@ def get_identity(request: Request) -> AgentIdentity:
     return request.app.state.identity  # type: ignore[no-any-return]
 
 
+def get_http_client(request: Request) -> httpx.AsyncClient:
+    """Provide the shared httpx.AsyncClient for outbound cross-agent calls."""
+    return request.app.state.http_client  # type: ignore[no-any-return]
+
+
 __all__ = [
     "get_settings",
     "get_ledger",
@@ -56,4 +62,5 @@ __all__ = [
     "get_transaction_engine",
     "get_capability_registry",
     "get_identity",
+    "get_http_client",
 ]

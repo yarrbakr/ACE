@@ -25,6 +25,10 @@ class ErrorResponse(BaseModel):
 class CreateTransactionRequest(BaseModel):
     seller_aid: str = Field(description="AID of the seller agent")
     capability_id: str = Field(description="ID of the capability to purchase")
+    seller_url: str | None = Field(
+        default=None,
+        description="HTTP base URL of the seller agent for cross-agent transactions",
+    )
 
 
 class SubmitQuoteRequest(BaseModel):
@@ -106,6 +110,26 @@ class StatusResponse(BaseModel):
     discovery_mode: str = "centralized"
     known_peers: int = 0
     seed_peers: list[str] = Field(default_factory=list)
+
+
+# ── IOU / cross-agent debt models ──────────────────────────
+
+
+class IOUDebtEntry(BaseModel):
+    debt_id: str
+    creditor_aid: str
+    debtor_aid: str
+    amount: int
+    tx_id: str
+    receipt_hash: str
+    status: str
+    created_at: str
+
+
+class IOUDebtsResponse(BaseModel):
+    status: str = "ok"
+    aid: str
+    debts: list[IOUDebtEntry]
 
 
 # ── Agent models ────────────────────────────────────────────

@@ -14,6 +14,8 @@ from ace.api.models import (
     ErrorResponse,
     HistoryEntry,
     HistoryResponse,
+    IOUDebtEntry,
+    IOUDebtsResponse,
     StatusResponse,
 )
 
@@ -143,3 +145,36 @@ async def get_status(
         known_peers=known_peers,
         seed_peers=settings.seed_peers,
     )
+
+
+@router.get(
+    "/debts",
+    summary="Get IOU debts for this agent",
+    response_model=IOUDebtsResponse,
+    responses={403: {"model": ErrorResponse}},
+)
+async def get_debts(
+    request: Request,
+    identity: AgentIdentity = Depends(get_identity),
+    ledger: Ledger = Depends(get_ledger),
+) -> IOUDebtsResponse | JSONResponse:
+    """Return all pending IOU debts (as creditor or debtor) for this agent."""
+    guard = _localhost_guard(request)
+    if guard:
+        return guard
+
+    debts = await ledger.get_iou_debts(identity.aid)
+    entries = [
+        IOUDebtEntry(
+            debt_id=d.debt_id,
+            creditor_aid=d.creditor_aid,
+            debtor_aid=d.debtor_aid,
+            amount=d.amount,
+            tx_id=d.tx_id,
+            receipt_hash=d.receipt_hash,
+            status=d.status,
+            created_at=d.created_at,
+        )
+        for d in debts
+    ]
+    return IOUDebtsResponse(aid=identity.aid, debts=entries)

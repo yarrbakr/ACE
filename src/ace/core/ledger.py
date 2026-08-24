@@ -16,8 +16,23 @@ SYSTEM_ISSUANCE = "SYSTEM:ISSUANCE"
 SYSTEM_ESCROW = "SYSTEM:ESCROW"
 SYSTEM_BURN = "SYSTEM:BURN"
 SYSTEM_FEES = "SYSTEM:FEES"
+SYSTEM_IOUS = "SYSTEM:IOUS"
 
 _SCHEMA_PATH = Path(__file__).parent / "schema.sql"
+
+
+@dataclass(frozen=True)
+class IOUDebt:
+    """A pending IOU debt recorded after a cross-agent transaction settlement."""
+
+    debt_id: str
+    creditor_aid: str   # seller — party owed money
+    debtor_aid: str     # buyer — party that owes money
+    amount: int
+    tx_id: str
+    receipt_hash: str   # sha256 of TransactionReceipt.signable_bytes()
+    status: str         # 'PENDING' or 'SETTLED'
+    created_at: str
 
 
 @dataclass(frozen=True)
@@ -249,6 +264,57 @@ class Ledger:
             ]
 
 
+    async def record_iou(
+        self,
+        creditor_aid: str,
+        debtor_aid: str,
+        amount: int,
+        tx_id: str,
+        receipt_hash: str,
+    ) -> str:
+        """Record a cross-agent IOU debt in cross_agent_debts.
+
+        Returns the new debt_id.
+        Raises sqlite3.IntegrityError if tx_id already has an IOU entry.
+        """
+        debt_id = str(uuid.uuid4())
+        async with self._connect() as db:
+            await db.execute(
+                """INSERT INTO cross_agent_debts
+                   (debt_id, creditor_aid, debtor_aid, amount, tx_id, receipt_hash)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (debt_id, creditor_aid, debtor_aid, amount, tx_id, receipt_hash),
+            )
+            await db.commit()
+        return debt_id
+
+    async def get_iou_debts(self, aid: str) -> list[IOUDebt]:
+        """Return all IOU debts where aid is either creditor or debtor."""
+        async with self._connect() as db:
+            cursor = await db.execute(
+                """SELECT debt_id, creditor_aid, debtor_aid, amount,
+                          tx_id, receipt_hash, status, created_at
+                   FROM cross_agent_debts
+                   WHERE creditor_aid = ? OR debtor_aid = ?
+                   ORDER BY created_at DESC""",
+                (aid, aid),
+            )
+            rows = await cursor.fetchall()
+            return [
+                IOUDebt(
+                    debt_id=row[0],
+                    creditor_aid=row[1],
+                    debtor_aid=row[2],
+                    amount=row[3],
+                    tx_id=row[4],
+                    receipt_hash=row[5],
+                    status=row[6],
+                    created_at=row[7],
+                )
+                for row in rows
+            ]
+
+
 # ── Module-level convenience functions ───────────────────────
 
 
@@ -279,6 +345,7 @@ async def get_balance(db_path: Path, aid: str) -> int:
 __all__ = [
     "Ledger",
     "LedgerEntry",
+    "IOUDebt",
     "mint_tokens",
     "transfer",
     "get_balance",
@@ -286,4 +353,5 @@ __all__ = [
     "SYSTEM_ESCROW",
     "SYSTEM_BURN",
     "SYSTEM_FEES",
+    "SYSTEM_IOUS",
 ]
