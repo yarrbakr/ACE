@@ -263,30 +263,105 @@ class Ledger:
                 for row in rows
             ]
 
-
-    async def record_iou(
-        self,
-        creditor_aid: str,
-        debtor_aid: str,
-        amount: int,
-        tx_id: str,
-        receipt_hash: str,
-    ) -> str:
-        """Record a cross-agent IOU debt in cross_agent_debts.
-
-        Returns the new debt_id.
-        Raises sqlite3.IntegrityError if tx_id already has an IOU entry.
+    async def record_iou(self, creditor_aid: str, debtor_aid: str, amount: int, tx_id: str, receipt_hash: str) -> str:
+        """Record an IOU debt in the database for cross-agent transactions.
+        
+        This method creates a new entry in the cross_agent_debts table that represents
+        a pending IOU owed by the debtor to the creditor. The debt can be settled later
+        using the settle_iou method.
+        
+        Returns:
+            str: The generated debt_id (UUID4)
+            
+        Raises:
+            ValueError: If amount <= 0 or if tx_id already has an IOU recorded
         """
+        if amount <= 0:
+            raise ValueError(f"IOU amount must be positive, got {amount}")
+            
         debt_id = str(uuid.uuid4())
+        
         async with self._connect() as db:
+            # Insert the new IOU debt record
             await db.execute(
                 """INSERT INTO cross_agent_debts
-                   (debt_id, creditor_aid, debtor_aid, amount, tx_id, receipt_hash)
-                   VALUES (?, ?, ?, ?, ?, ?)""",
+                   (debt_id, creditor_aid, debtor_aid, amount, tx_id, receipt_hash, status)
+                   VALUES (?, ?, ?, ?, ?, ?, 'PENDING')""",
                 (debt_id, creditor_aid, debtor_aid, amount, tx_id, receipt_hash),
             )
             await db.commit()
+            
         return debt_id
+
+    async def settle_iou(self, debt_id: str) -> None:
+        """Settle an IOU by transferring the debt amount from debtor to creditor.
+         
+        Marks the IOU as SETTLED in the database and performs the double-entry 
+        transfer of funds between the debtor and creditor accounts.
+         
+        Raises:
+            AccountNotFoundError: If either creditor or debtor account doesn't exist
+            ValueError: If the IOU is not found or already settled
+        """
+        async with self._connect() as db:
+            # First, get the IOU details to verify it exists and is pending
+            cursor = await db.execute(
+                "SELECT creditor_aid, debtor_aid, amount FROM cross_agent_debts WHERE debt_id = ?",
+                (debt_id,)
+            )
+            row = await cursor.fetchone()
+            if not row:
+                raise ValueError(f"IOU not found: {debt_id}")
+            
+            creditor_aid, debtor_aid, amount = row
+            
+            # Check if already settled
+            cursor = await db.execute(
+                "SELECT status FROM cross_agent_debts WHERE debt_id = ?",
+                (debt_id,)
+            )
+            status_row = await cursor.fetchone()
+            if status_row and status_row[0] == 'SETTLED':
+                raise ValueError(f"IOU already settled: {debt_id}")
+            
+            # Validate both accounts exist
+            try:
+                creditor_balance = await self.get_balance(creditor_aid)
+            except AccountNotFoundError:
+                raise AccountNotFoundError(f"Creditor account not found: {creditor_aid}")
+            
+            try:
+                debtor_balance = await self.get_balance(debtor_aid)
+            except AccountNotFoundError:
+                raise AccountNotFoundError(f"Debtor account not found: {debtor_aid}")
+            
+            # Check that debtor has enough balance
+            if debtor_balance < amount:
+                raise ValueError(f"Insufficient balance in debtor account {debtor_aid}: "
+                               f"have {debtor_balance}, need {amount}")
+            
+            # Perform transfer (double entry bookkeeping)
+            # Debit the debtor's account  
+            new_debtor_balance = debtor_balance - amount
+            await db.execute(
+                "UPDATE accounts SET balance = ?, updated_at = datetime('now') WHERE aid = ?",
+                (new_debtor_balance, debtor_aid),
+            )
+            
+            # Credit the creditor's account
+            new_creditor_balance = creditor_balance + amount
+            await db.execute(
+                "UPDATE accounts SET balance = ?, updated_at = datetime('now') WHERE aid = ?",
+                (new_creditor_balance, creditor_aid),
+            )
+            
+            # Mark IOU as settled in cross_agent_debts table
+            await db.execute(
+                "UPDATE cross_agent_debts SET status = 'SETTLED' WHERE debt_id = ?",
+                (debt_id,)
+            )
+            
+            await db.commit()
 
     async def get_iou_debts(self, aid: str) -> list[IOUDebt]:
         """Return all IOU debts where aid is either creditor or debtor."""
